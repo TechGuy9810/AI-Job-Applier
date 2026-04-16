@@ -1,19 +1,23 @@
-import express from 'express';
-import dotenv from 'dotenv';
-import routes from './routes/index.js';
 
-// Load environment variables
+import dotenv from 'dotenv';
+import app from './app.js';
+import connectDB from './config/db.js';
+import config from './config/config.js';
+// Load env variables
 dotenv.config();
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+const startServer = async () => {
+  try {
+    await connectDB();
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${config.port}`);
+    });
 
-// Register routes
-app.use('/api', routes);
+  } catch (error) {
+    console.error(error);
+    process.exit(1);
+  }
+};
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+startServer();

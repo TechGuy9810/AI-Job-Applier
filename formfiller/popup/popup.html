@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Form Filler</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+
+  <!-- ══ HEADER ═══════════════════════════════════════════ -->
+  <header class="header">
+    <div class="header-icon">✦</div>
+    <div class="header-text">
+      <h1 class="header-title">AI Form Filler</h1>
+      <p class="header-subtitle">Fill any form with your data instantly</p>
+    </div>
+    <!-- API key status badge -->
+    <div id="apiStatusBadge" class="status-badge status-badge--checking">
+      <span class="status-dot"></span>
+      <span id="apiStatusText">Checking…</span>
+    </div>
+  </header>
+
+  <!-- ══ MAIN CONTENT ══════════════════════════════════════ -->
+  <main class="main">
+
+    <!-- Context textarea -->
+    <div class="field-group">
+      <label class="label" for="contextInput">
+        Your Personal Context
+        <span class="label-hint">Text or upload a PDF below</span>
+      </label>
+      <textarea
+        id="contextInput"
+        class="textarea"
+        placeholder="Paste your details here…
+Example:
+Name: John Doe
+Email: john@example.com
+Phone: +1 555-0100
+Company: Acme Corp
+Address: 123 Main St, New York, NY 10001
+Date of Birth: January 15, 1990"
+        rows="6"
+      ></textarea>
+      <div class="char-counter"><span id="charCount">0</span> characters</div>
+    </div>
+
+    <!-- PDF Upload -->
+    <div class="field-group">
+      <label class="label">
+        Upload PDF <span class="label-hint">Resume, ID, application — any document</span>
+      </label>
+
+      <!-- Drop zone -->
+      <div id="pdfDropZone" class="pdf-drop-zone" role="button" tabindex="0" aria-label="Upload PDF file">
+        <input type="file" id="pdfFileInput" accept="application/pdf" hidden />
+        <div id="pdfDropIcon" class="pdf-drop-icon">📄</div>
+        <div id="pdfDropText" class="pdf-drop-text">
+          <strong>Drop PDF here</strong> or <span class="pdf-drop-link">click to browse</span>
+        </div>
+        <div id="pdfDropSub" class="pdf-drop-sub">Supports PDF up to 20 MB</div>
+      </div>
+
+      <!-- File selected state -->
+      <div id="pdfFileInfo" class="pdf-file-info pdf-file-info--hidden">
+        <span class="pdf-file-icon">📎</span>
+        <span id="pdfFileName" class="pdf-file-name">document.pdf</span>
+        <button id="pdfClearBtn" class="pdf-clear-btn" title="Remove PDF">✕</button>
+      </div>
+    </div>
+
+    <!-- Job Description (collapsible) -->
+    <div class="jd-panel">
+      <button id="jdToggle" class="jd-toggle" aria-expanded="false">
+        <span class="jd-toggle-icon">📋</span>
+        Job Description
+        <span class="label-hint" style="text-transform:none;letter-spacing:0;font-weight:400;">for smarter answers</span>
+        <span class="jd-toggle-arrow">▾</span>
+      </button>
+      <div id="jdBody" class="jd-body jd-body--collapsed">
+        <textarea
+          id="jdInput"
+          class="textarea textarea--teal"
+          placeholder="Paste the job description or candidate requirements here…
+Gemini will use this to write tailored answers to behavioral & personal questions."
+          rows="6"
+        ></textarea>
+        <div class="char-counter"><span id="jdCharCount">0</span> characters</div>
+      </div>
+    </div>
+
+    <!-- Action buttons row -->
+    <div class="btn-row">
+      <button id="fillBtn" class="btn btn--primary">
+        <span class="btn-icon">⚡</span>
+        <span id="fillBtnText">Fill Fields</span>
+      </button>
+      <button id="answerBtn" class="btn btn--teal">
+        <span class="btn-icon">✍️</span>
+        <span id="answerBtnText">Answer Questions</span>
+      </button>
+    </div>
+
+    <!-- Status / Result card -->
+    <div id="resultCard" class="result-card result-card--hidden"></div>
+
+  </main>
+
+  <!-- ══ SETTINGS PANEL ════════════════════════════════════ -->
+  <section class="settings-panel">
+    <button id="settingsToggle" class="settings-toggle" aria-expanded="false">
+      <span class="settings-toggle-icon">⚙</span> API Settings
+      <span class="settings-toggle-arrow">▾</span>
+    </button>
+
+    <div id="settingsBody" class="settings-body settings-body--collapsed">
+      <label class="label" for="apiKeyInput">Gemini API Key</label>
+      <div class="api-key-row">
+        <input
+          id="apiKeyInput"
+          type="password"
+          class="input"
+          placeholder="AIza…"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button id="toggleApiVisibility" class="btn btn--icon" title="Show/Hide">👁</button>
+      </div>
+      <button id="saveApiKeyBtn" class="btn btn--secondary">Save Key</button>
+      <p class="settings-note">
+        Key is stored locally in your browser. Sent only to Google Gemini API.
+      </p>
+    </div>
+  </section>
+
+  <!-- ══ FOOTER ════════════════════════════════════════════ -->
+  <footer class="footer">
+    Powered by Google Gemini 2.5 Flash · Manifest V3
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>
