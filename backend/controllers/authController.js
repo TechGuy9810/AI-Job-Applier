@@ -1,7 +1,7 @@
 import {
     signupService,
     loginService,
-    googleLoginService
+    verifyGoogleToken
 } from '../services/authService.js';
 
 import {
