@@ -465,7 +465,7 @@ body {
 }
 
 .settings-body--open {
-  max-height: 200px;
+  max-height: 600px;
   padding-top: 4px;
   padding-bottom: 14px;
 }
@@ -481,6 +481,38 @@ body {
   color: var(--text-muted);
   line-height: 1.4;
   padding: 0 2px;
+}
+
+/* ── Settings Section (sub-group within settings body) ── */
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.settings-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-section-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.settings-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+}
+
+.settings-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
 }
 
 /* ── PDF Drop Zone ────────────────────────────────────── */

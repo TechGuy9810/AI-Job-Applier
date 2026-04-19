@@ -43,6 +43,22 @@ const jdCharCount         = document.getElementById('jdCharCount');
 const answerBtn           = document.getElementById('answerBtn');
 const answerBtnText       = document.getElementById('answerBtnText');
 
+// ── Account / Auth elements ─────────────────────────────────────────────────
+const authStatusBadge        = document.getElementById('authStatusBadge');
+const authStatusText         = document.getElementById('authStatusText');
+const backendUrlInput        = document.getElementById('backendUrlInput');
+const saveBackendUrlBtn      = document.getElementById('saveBackendUrlBtn');
+const loginSection           = document.getElementById('loginSection');
+const loggedInSection        = document.getElementById('loggedInSection');
+const loginEmailInput        = document.getElementById('loginEmail');
+const loginPasswordInput     = document.getElementById('loginPassword');
+const toggleLoginPwVisibility = document.getElementById('toggleLoginPwVisibility');
+const loginBtn               = document.getElementById('loginBtn');
+const logoutBtn              = document.getElementById('logoutBtn');
+const syncProfileBtn         = document.getElementById('syncProfileBtn');
+const syncProfileBtnText     = document.getElementById('syncProfileBtnText');
+const syncProfileNote        = document.getElementById('syncProfileNote');
+
 // ─────────────────────────────────────────────
 // PDF STATE
 // ─────────────────────────────────────────────
@@ -333,13 +349,7 @@ answerBtn.addEventListener('click', async () => {
   const context = contextInput.value.trim();
   const jd      = jdInput.value.trim();
 
-  if (!context && !currentPdfBase64) {
-    showResult(
-      '<span class="result-card__icon">⚠️</span> Please enter your context or upload a resume PDF first.',
-      'info'
-    );
-    return;
-  }
+  // Profile data comes from DB; extra context + PDF are both optional
 
   hideResult();
   setAnswerLoading(true);
@@ -418,22 +428,7 @@ answerBtn.addEventListener('click', async () => {
 fillBtn.addEventListener('click', async () => {
   const context = contextInput.value.trim();
 
-  // Validate: need at least context OR a PDF
-  if (!context && !currentPdfBase64) {
-    showResult(
-      '<span class="result-card__icon">⚠️</span> Please enter context text or upload a PDF.',
-      'info'
-    );
-    return;
-  }
-
-  if (!currentPdfBase64 && context.length < 20) {
-    showResult(
-      '<span class="result-card__icon">⚠️</span> Context is too short. Provide more details or upload a PDF.',
-      'info'
-    );
-    return;
-  }
+  // Profile data comes from DB; extra context + PDF are both optional
 
   hideResult();
   setLoading(true);
@@ -526,71 +521,188 @@ function escapeHtml(str) {
 }
 
 // ─────────────────────────────────────────────
+// AUTH STATUS
+// ─────────────────────────────────────────────
+
+/**
+ * Updates the auth status badge in the settings panel.
+ * @param {'ok'|'missing'|'checking'} state
+ * @param {string} label
+ */
+function setAuthStatusBadge(state, label) {
+  authStatusBadge.className = `status-badge status-badge--${state}`;
+  authStatusText.textContent = label;
+}
+
+/**
+ * Checks backend auth status and toggles login / logged-in sections.
+ */
+function checkAuthStatus() {
+  chrome.runtime.sendMessage({ action: 'GET_AUTH_STATUS' }, (response) => {
+    if (chrome.runtime.lastError || !response) {
+      setAuthStatusBadge('missing', 'Not logged in');
+      loginSection.style.display    = '';
+      loggedInSection.style.display = 'none';
+      return;
+    }
+    if (response.isLoggedIn) {
+      setAuthStatusBadge('ok', 'Logged in ✓');
+      loginSection.style.display    = 'none';
+      loggedInSection.style.display = '';
+    } else {
+      setAuthStatusBadge('missing', 'Not logged in');
+      loginSection.style.display    = '';
+      loggedInSection.style.display = 'none';
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
+// BACKEND URL
+// ─────────────────────────────────────────────
+
+// Load saved backend URL into the input
+chrome.storage.local.get(['backendUrl'], (result) => {
+  backendUrlInput.value = result.backendUrl || 'http://localhost:3000';
+});
+
+saveBackendUrlBtn.addEventListener('click', () => {
+  const url = backendUrlInput.value.trim().replace(/\/$/, ''); // strip trailing slash
+  if (!url) {
+    showResult('<span class="result-card__icon">⚠️</span> Please enter a valid backend URL.', 'error');
+    return;
+  }
+  chrome.runtime.sendMessage({ action: 'SAVE_BACKEND_URL', url }, (response) => {
+    if (chrome.runtime.lastError || !response?.success) {
+      showResult('<span class="result-card__icon">❌</span> Failed to save backend URL.', 'error');
+      return;
+    }
+    showResult('<span class="result-card__icon">✅</span> Backend URL saved.', 'success');
+  });
+});
+
+// ─────────────────────────────────────────────
+// LOGIN / LOGOUT
+// ─────────────────────────────────────────────
+
+// Toggle login password visibility
+toggleLoginPwVisibility.addEventListener('click', () => {
+  const isPassword = loginPasswordInput.type === 'password';
+  loginPasswordInput.type = isPassword ? 'text' : 'password';
+  toggleLoginPwVisibility.textContent = isPassword ? '🙈' : '👁';
+});
+
+// Login button
+loginBtn.addEventListener('click', async () => {
+  const email    = loginEmailInput.value.trim();
+  const password = loginPasswordInput.value;
+
+  if (!email || !password) {
+    showResult('<span class="result-card__icon">⚠️</span> Please enter your email and password.', 'error');
+    return;
+  }
+
+  loginBtn.disabled = true;
+  loginBtn.textContent = 'Logging in…';
+
+  chrome.runtime.sendMessage({ action: 'LOGIN', email, password }, (response) => {
+    loginBtn.disabled = false;
+    loginBtn.textContent = 'Login';
+
+    if (chrome.runtime.lastError) {
+      showResult(`<span class="result-card__icon">❌</span> Extension error: ${chrome.runtime.lastError.message}`, 'error');
+      return;
+    }
+
+    if (!response?.success) {
+      showResult(`<span class="result-card__icon">❌</span> ${escapeHtml(response?.error || 'Login failed.')}`, 'error');
+      return;
+    }
+
+    loginEmailInput.value    = '';
+    loginPasswordInput.value = '';
+    setAuthStatusBadge('ok', 'Logged in ✓');
+    loginSection.style.display    = 'none';
+    loggedInSection.style.display = '';
+    showResult('<span class="result-card__icon">✅</span> Logged in! Profile data will be used automatically.', 'success');
+
+    // Kick off a background cache warm-up
+    chrome.runtime.sendMessage({ action: 'SYNC_PROFILE' });
+  });
+});
+
+// Allow pressing Enter in password field to trigger login
+loginPasswordInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') loginBtn.click();
+});
+
+// Logout button
+logoutBtn.addEventListener('click', () => {
+  chrome.runtime.sendMessage({ action: 'LOGOUT' }, () => {
+    setAuthStatusBadge('missing', 'Not logged in');
+    loginSection.style.display    = '';
+    loggedInSection.style.display = 'none';
+    syncProfileNote.style.display = 'none';
+    showResult('<span class="result-card__icon">ℹ️</span> Logged out. Using manual context only.', 'info');
+  });
+});
+
+// ─────────────────────────────────────────────
+// SYNC PROFILE
+// ─────────────────────────────────────────────
+
+syncProfileBtn.addEventListener('click', () => {
+  syncProfileBtnText.textContent = '⏳ Syncing…';
+  syncProfileBtn.disabled = true;
+
+  chrome.runtime.sendMessage({ action: 'SYNC_PROFILE' }, (response) => {
+    syncProfileBtn.disabled = false;
+    syncProfileBtnText.textContent = '🔄 Sync Profile';
+
+    if (chrome.runtime.lastError) {
+      showResult(`<span class="result-card__icon">❌</span> ${chrome.runtime.lastError.message}`, 'error');
+      return;
+    }
+
+    if (!response?.success) {
+      showResult(`<span class="result-card__icon">❌</span> ${escapeHtml(response?.error || 'Sync failed.')}`, 'error');
+      return;
+    }
+
+    const note = `✅ Synced ${response.fieldCount} field aliases from your profile.`;
+    syncProfileNote.textContent   = note;
+    syncProfileNote.style.display = '';
+    showResult(`<span class="result-card__icon">✅</span> Profile synced — ${response.fieldCount} field aliases ready.`, 'success');
+  });
+});
+
+// ─────────────────────────────────────────────
 // INIT
 // ─────────────────────────────────────────────
 
 // Check API key status on popup open
 checkApiKeyStatus();
 
-// ─── Load saved context ───────────────────────────────────────────────────────
-const DEFAULT_CONTEXT = `Citizenship: Indian
-Nationality: Indian
-Gender: Male
-Full Address: A-191/C Sainik Enclave, Vikas Nagar, Uttam Nagar, New Delhi, 110059
-Address Line 1: A-191/C Sainik Enclave
-Address Line 2: Vikas Nagar, Uttam Nagar
-Street: A-191/C Sainik Enclave
-Locality / Area: Vikas Nagar
-Sub-locality: Uttam Nagar
-City: New Delhi
-District: West Delhi
-State: Delhi
-Country: India
-PIN Code: 110059
-Pincode: 110059
-Zip Code: 110059
-Preferred Job Location: Delhi NCR (Delhi, Gurgaon, Noida, Faridabad, Gurugram)
-Current Location: New Delhi, Delhi
-Disability: None (No disability)
-Prior relation with organization: None (No prior relation / Not applicable)
-Highest Education: BCA (Bachelor of Computer Applications)
-Degree: BCA
-Course: Bachelor of Computer Applications
-Education Level: Graduate
-Graduation Year: 2024
-Passing Year: 2024
-Expected Annual Salary: 300000
-Expected CTC: 300000
-Expected Salary (LPA): 3
-Current Annual Salary: 120000
-Current CTC: 120000
-Current Salary (LPA): 1.2
-Notice Period: Immediately (0 days)
-Joining Availability: Immediately / Can join immediately
-Available to join in (days): 0
-`;
+// Check auth status on popup open
+checkAuthStatus();
 
-// Load previously saved context from local storage (UX quality of life)
-chrome.storage.local.get(['savedContext'], (result) => {
-  const saved = result.savedContext;
-  if (saved && saved.trim().length > 0) {
-    // User has edited context before — restore their version
-    contextInput.value = saved;
-  } else {
-    // First time — pre-fill with the default facts
-    contextInput.value = DEFAULT_CONTEXT;
-    chrome.storage.local.set({ savedContext: DEFAULT_CONTEXT });
-  }
-  charCount.textContent = contextInput.value.length;
-});
-
-// Auto-save context to storage as user types (debounced)
+// ─── Context textarea: auto-save user overrides ──────────────────────────────
+// The textarea is an optional extra-context field; data now comes from the DB.
+// We still persist whatever the user types so it survives popup close/open.
 let saveTimer;
 contextInput.addEventListener('input', () => {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     chrome.storage.local.set({ savedContext: contextInput.value });
   }, 800);
+});
+
+// Restore any previously typed context override
+chrome.storage.local.get(['savedContext'], (result) => {
+  if (result.savedContext) {
+    contextInput.value = result.savedContext;
+    charCount.textContent = contextInput.value.length;
+  }
 });
 
 // Auto-save JD to storage as user types (debounced)

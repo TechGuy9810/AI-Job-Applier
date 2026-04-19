@@ -28,21 +28,19 @@
     <!-- Context textarea -->
     <div class="field-group">
       <label class="label" for="contextInput">
-        Your Personal Context
-        <span class="label-hint">Text or upload a PDF below</span>
+        Extra Context
+        <span class="label-hint">Optional — supplements your profile data</span>
       </label>
       <textarea
         id="contextInput"
         class="textarea"
-        placeholder="Paste your details here…
+        placeholder="Add any extra details not in your profile…
 Example:
-Name: John Doe
-Email: john@example.com
-Phone: +1 555-0100
-Company: Acme Corp
-Address: 123 Main St, New York, NY 10001
-Date of Birth: January 15, 1990"
-        rows="6"
+LinkedIn: https://linkedin.com/in/you
+GitHub: https://github.com/you
+Availability: Immediate
+Or paste a job-specific note here."
+        rows="4"
       ></textarea>
       <div class="char-counter"><span id="charCount">0</span> characters</div>
     </div>
@@ -111,27 +109,99 @@ Gemini will use this to write tailored answers to behavioral & personal question
   <!-- ══ SETTINGS PANEL ════════════════════════════════════ -->
   <section class="settings-panel">
     <button id="settingsToggle" class="settings-toggle" aria-expanded="false">
-      <span class="settings-toggle-icon">⚙</span> API Settings
+      <span class="settings-toggle-icon">⚙</span> Settings
       <span class="settings-toggle-arrow">▾</span>
     </button>
 
     <div id="settingsBody" class="settings-body settings-body--collapsed">
-      <label class="label" for="apiKeyInput">Gemini API Key</label>
-      <div class="api-key-row">
-        <input
-          id="apiKeyInput"
-          type="password"
-          class="input"
-          placeholder="AIza…"
-          autocomplete="off"
-          spellcheck="false"
-        />
-        <button id="toggleApiVisibility" class="btn btn--icon" title="Show/Hide">👁</button>
+
+      <!-- ── ACCOUNT SECTION ──────────────────────────────── -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <span class="settings-section-icon">👤</span>
+          <span class="settings-section-title">Account</span>
+          <!-- Auth status badge -->
+          <div id="authStatusBadge" class="status-badge status-badge--checking" style="margin-left:auto;">
+            <span class="status-dot"></span>
+            <span id="authStatusText">Checking…</span>
+          </div>
+        </div>
+
+        <!-- Backend URL -->
+        <label class="label" for="backendUrlInput">Backend URL</label>
+        <div class="api-key-row">
+          <input
+            id="backendUrlInput"
+            type="text"
+            class="input"
+            placeholder="http://localhost:3000"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button id="saveBackendUrlBtn" class="btn btn--icon" title="Save URL">💾</button>
+        </div>
+
+        <!-- Login form (shown when logged out) -->
+        <div id="loginSection">
+          <label class="label" for="loginEmail" style="margin-top:10px;">Email</label>
+          <input
+            id="loginEmail"
+            type="email"
+            class="input"
+            placeholder="you@example.com"
+            autocomplete="email"
+          />
+          <label class="label" for="loginPassword" style="margin-top:8px;">Password</label>
+          <div class="api-key-row">
+            <input
+              id="loginPassword"
+              type="password"
+              class="input"
+              placeholder="••••••••"
+              autocomplete="current-password"
+            />
+            <button id="toggleLoginPwVisibility" class="btn btn--icon" title="Show/Hide">👁</button>
+          </div>
+          <button id="loginBtn" class="btn btn--secondary" style="margin-top:8px;">Login</button>
+        </div>
+
+        <!-- Logged-in actions (shown when logged in) -->
+        <div id="loggedInSection" style="display:none;">
+          <div class="btn-row" style="margin-top:8px;">
+            <button id="syncProfileBtn" class="btn btn--secondary">
+              <span id="syncProfileBtnText">🔄 Sync Profile</span>
+            </button>
+            <button id="logoutBtn" class="btn btn--icon" title="Logout" style="color:#f87171;">⬡ Logout</button>
+          </div>
+          <p class="settings-note" id="syncProfileNote" style="display:none;"></p>
+        </div>
       </div>
-      <button id="saveApiKeyBtn" class="btn btn--secondary">Save Key</button>
-      <p class="settings-note">
-        Key is stored locally in your browser. Sent only to Google Gemini API.
-      </p>
+
+      <div class="settings-divider"></div>
+
+      <!-- ── GEMINI API KEY SECTION ───────────────────────── -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <span class="settings-section-icon">🤖</span>
+          <span class="settings-section-title">Gemini API Key</span>
+        </div>
+        <div class="api-key-row">
+          <input
+            id="apiKeyInput"
+            type="password"
+            class="input"
+            placeholder="AIza…"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button id="toggleApiVisibility" class="btn btn--icon" title="Show/Hide">👁</button>
+        </div>
+        <button id="saveApiKeyBtn" class="btn btn--secondary">Save Key</button>
+        <p class="settings-note">
+          Key is stored locally in your browser. Sent only to Google Gemini API.
+        </p>
+      </div>
+
     </div>
   </section>
 

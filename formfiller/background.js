@@ -3,13 +3,21 @@
  * Handles all secure API communication.
  * Acts as the trusted intermediary between popup and content script.
  *
- * Flow:
- *   Popup → background (FILL_REQUEST with context)
+ * Flow (updated — API-first):
+ *   Popup → background (FILL_REQUEST with optional context)
+ *   background → Backend API (GET /api/profile/form-data) ← NEW
  *   background → active tab content script (EXTRACT_FIELDS)
- *   background → Gemini API (fields + context)
+ *   background → Gemini API (fields + enriched context)
  *   background → active tab content script (FILL_FORM with mapping)
  *   background → popup (result/status)
  */
+
+import {
+  login,
+  fetchProfileFormData,
+  getAuthToken,
+  clearAuthToken,
+} from './utils/api.js';
 
 // ─────────────────────────────────────────────
 // CONFIGURATION
@@ -20,9 +28,8 @@
  * The API key is stored in chrome.storage.local (managed via popup settings).
  * Pre-seeded with the user's Gemini API key as the default.
  */
-const GEMINI_MODEL = 'gemini-2.5-flash';
+const GEMINI_MODEL    = 'gemini-2.5-flash';
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-const DEFAULT_API_KEY = 'AIzaSyDLSW1UsmzUybMG7E3xvjaQWAIKSlovLTs';
 
 // ─────────────────────────────────────────────
 // API KEY MANAGEMENT
@@ -30,14 +37,70 @@ const DEFAULT_API_KEY = 'AIzaSyDLSW1UsmzUybMG7E3xvjaQWAIKSlovLTs';
 
 /**
  * Retrieves the Gemini API key from Chrome's local storage.
- * Falls back to the DEFAULT_API_KEY if none has been saved yet.
+ * Returns null if no key has been saved — user must enter it via Settings.
  */
 async function getApiKey() {
   return new Promise((resolve) => {
     chrome.storage.local.get(['apiKey'], (result) => {
-      resolve(result.apiKey || DEFAULT_API_KEY);
+      resolve(result.apiKey || null);
     });
   });
+}
+
+// ─────────────────────────────────────────────
+// PROFILE FORM DATA — API-FIRST HELPER
+// ─────────────────────────────────────────────
+
+/**
+ * Attempts to fetch the alias-expanded profile form data from the backend.
+ * Logs but never throws — failures gracefully return null so the Gemini-only
+ * flow can continue uninterrupted.
+ *
+ * @param {boolean} forceRefresh — bypass local cache
+ * @returns {Promise<Object|null>}
+ */
+async function tryFetchProfileFormData(forceRefresh = false) {
+  try {
+    const formData = await fetchProfileFormData(forceRefresh);
+    console.log('[AI Form Filler BG] ✅ Profile form data loaded from backend.');
+    return formData;
+  } catch (err) {
+    if (err.message === 'NOT_AUTHENTICATED') {
+      console.log('[AI Form Filler BG] No auth token — skipping backend profile fetch.');
+    } else if (err.message === 'AUTH_EXPIRED') {
+      console.warn('[AI Form Filler BG] Auth token expired — skipping backend profile fetch.');
+    } else if (err.message === 'PROFILE_NOT_FOUND') {
+      console.warn('[AI Form Filler BG] No profile found on backend — skipping.');
+    } else {
+      console.warn('[AI Form Filler BG] Backend profile fetch failed:', err.message);
+    }
+    return null;
+  }
+}
+
+/**
+ * Converts a flat alias-map (from backend) into a Gemini-ready context string.
+ * De-duplicates values so the prompt doesn't balloon with repeated data.
+ *
+ * @param {Object} formData — { "Label": "value" }
+ * @returns {string}
+ */
+function formDataToContextString(formData) {
+  if (!formData || !Object.keys(formData).length) return '';
+
+  // Track which canonical value has already been emitted to avoid huge repetition
+  // We only emit the first alias for each unique value to keep the prompt concise
+  const seen = new Map(); // value → first key
+  const lines = [];
+
+  for (const [key, value] of Object.entries(formData)) {
+    if (!seen.has(value)) {
+      seen.set(value, key);
+      lines.push(`${key}: ${value}`);
+    }
+  }
+
+  return lines.join('\n');
 }
 
 // ─────────────────────────────────────────────
@@ -82,9 +145,9 @@ Rules:
 - For dropdowns, use the exact option text from the provided list.
 - If you don't have data for a field, omit it from the response.
 - NUMERIC FIELDS: If the field type is "number", or the label relates to salary/CTC/experience/age/pincode/percentage/score/phone, return ONLY the raw number with NO units, NO commas, NO currency symbols, NO text (e.g. 300000 not "3 LPA", 1234567890 not "+91-1234567890").
-- JOINING / NOTICE PERIOD: For any field asking about notice period, joining time, or availability to join, always prefer "Immediately" or "0" or the option with the fewest days (choose whichever is lowest, between 0–15 days). Never select options above 15 days.
-- LOCATION: For preferred location fields, prefer Delhi, Gurgaon, Noida, or Delhi NCR. If multiple selections allowed, include all of them.
-- GENDER: Always select "Male" or the equivalent option.
+- NOTICE PERIOD / JOINING: Use the exact value from the user data. If it says "Immediately" or 0 days, pick the earliest available option.
+- LOCATION: Use the preferred locations from the user data. If multiple selections allowed, include all provided locations.
+- GENDER: Use the gender from the user data.
 
 ${contextSection}
 
@@ -186,10 +249,10 @@ Instructions:
 - Write in first person ("I", "my", "me").
 - Sound professional, confident, and genuine.
 - Tailor each answer to the job description when provided.
-- Highlight relevant skills, achievements, and motivation from the resume.
-- For notice period / joining questions: state "I can join immediately."
+- Highlight relevant skills, achievements, and motivation from the context or resume.
+- For notice period / joining questions: use the notice period from the user data; if it is 0, state "I can join immediately."
 - For salary questions: do not answer with full sentences — let the form fill handle those.
-- For education/degree mentions: say "I am a BCA graduate" or "I hold a BCA degree" — do NOT mention the specific graduation year (2024) in written answers.
+- Use the education and degree details from the user context when mentioned. Do NOT invent or hardcode specific years.
 - Do NOT include the question text in your answer, just the answer itself.
 
 Questions to answer:
@@ -340,18 +403,52 @@ async function ensureContentScriptInjected(tabId) {
 // ─────────────────────────────────────────────
 
 /**
- * Full flow: extract fields → call Gemini → fill form.
- * @param {string} context - User context text
+ * Full flow: fetch profile from backend → extract fields → call Gemini → fill form.
+ *
+ * Data priority for Gemini context:
+ *   1. Backend profile form-data (alias-expanded, most accurate)
+ *   2. Manual context textarea (user override / extra info)
+ *   3. PDF resume (multimodal input to Gemini)
+ *
+ * @param {string} manualContext - Context text from popup textarea (may be empty)
  * @param {number} tabId - Active tab ID
  * @param {string|null} pdfBase64 - Optional PDF as base64
  * @param {string} pdfMimeType - PDF mime type
+ * @param {string} pdfFileName - PDF filename
  * @returns {Object} - Result summary
  */
-async function runFormFillFlow(context, tabId, pdfBase64 = null, pdfMimeType = 'application/pdf', pdfFileName = 'document.pdf') {
+async function runFormFillFlow(
+  manualContext,
+  tabId,
+  pdfBase64 = null,
+  pdfMimeType = 'application/pdf',
+  pdfFileName = 'document.pdf',
+) {
   // Step 1: Ensure content script is injected
   await ensureContentScriptInjected(tabId);
 
-  // Step 2: Extract form fields from the active tab
+  // Step 2: Try to fetch profile data from backend (non-blocking — fails gracefully)
+  const profileFormData = await tryFetchProfileFormData();
+
+  // Step 3: Build enriched context string
+  //   - Start with the backend alias-map (de-duplicated, concise)
+  //   - Append manual textarea context (may add extra fields not in the profile)
+  const backendContext = profileFormData
+    ? formDataToContextString(profileFormData)
+    : '';
+
+  // Combine: backend first (canonical), then manual overrides/additions
+  const enrichedContext = [backendContext, manualContext]
+    .filter(Boolean)
+    .join('\n\n---\n\n');
+
+  console.log(
+    `[AI Form Filler BG] Context: ${backendContext ? 'Backend ✅' : 'Backend ❌ (no profile/auth)'} | ` +
+    `Manual: ${manualContext ? `${manualContext.length} chars` : 'empty'} | ` +
+    `PDF: ${pdfBase64 ? 'yes' : 'no'}`
+  );
+
+  // Step 4: Extract form fields from the active tab
   console.log('[AI Form Filler BG] Extracting fields from tab', tabId);
   const extractResponse = await sendToContentScript(tabId, { action: 'EXTRACT_FIELDS' });
 
@@ -366,15 +463,15 @@ async function runFormFillFlow(context, tabId, pdfBase64 = null, pdfMimeType = '
 
   console.log(`[AI Form Filler BG] Got ${fields.length} fields. Calling Gemini...`);
 
-  // Step 3: Call Gemini API (with optional PDF) to get the field mapping
-  const mapping = await callGeminiApi(context, fields, pdfBase64, pdfMimeType);
+  // Step 5: Call Gemini API (with optional PDF) to get the field mapping
+  const mapping = await callGeminiApi(enrichedContext, fields, pdfBase64, pdfMimeType);
   console.log('[AI Form Filler BG] Received mapping from Gemini:', mapping);
 
   if (!mapping || Object.keys(mapping).length === 0) {
     throw new Error('Gemini returned an empty mapping. Please provide more detailed context.');
   }
 
-  // Step 4: Fill the form using the mapping, passing PDF data for file inputs
+  // Step 6: Fill the form using the mapping, passing PDF data for file inputs
   const fillResponse = await sendToContentScript(tabId, {
     action: 'FILL_FORM',
     mapping,
@@ -389,10 +486,11 @@ async function runFormFillFlow(context, tabId, pdfBase64 = null, pdfMimeType = '
   }
 
   return {
-    fieldsFound: fields.length,
-    fieldsMapped: Object.keys(mapping).length,
-    fieldsFilled: fillResponse.filled,
-    fieldsFailed: fillResponse.failed,
+    fieldsFound:    fields.length,
+    fieldsMapped:   Object.keys(mapping).length,
+    fieldsFilled:   fillResponse.filled,
+    fieldsFailed:   fillResponse.failed,
+    usedBackend:    !!profileFormData,
   };
 }
 
@@ -403,8 +501,13 @@ async function runFormFillFlow(context, tabId, pdfBase64 = null, pdfMimeType = '
 /**
  * Extracts question fields, writes 100-200 word answers via Gemini, fills them.
  */
-async function runAnswerQuestionsFlow(context, jd, tabId, pdfBase64, pdfMimeType, pdfFileName) {
+async function runAnswerQuestionsFlow(manualContext, jd, tabId, pdfBase64, pdfMimeType, pdfFileName) {
   await ensureContentScriptInjected(tabId);
+
+  // Enrich context with backend profile data
+  const profileFormData = await tryFetchProfileFormData();
+  const backendContext  = profileFormData ? formDataToContextString(profileFormData) : '';
+  const enrichedContext = [backendContext, manualContext].filter(Boolean).join('\n\n---\n\n');
 
   // Extract ALL fields first
   const extractResponse = await sendToContentScript(tabId, { action: 'EXTRACT_FIELDS' });
@@ -413,7 +516,7 @@ async function runAnswerQuestionsFlow(context, jd, tabId, pdfBase64, pdfMimeType
   }
 
   // Filter to only question-like fields
-  const allFields     = extractResponse.fields || [];
+  const allFields      = extractResponse.fields || [];
   const questionFields = allFields.filter(isQuestionField);
 
   console.log(`[AI Form Filler BG] Question fields found: ${questionFields.length} / ${allFields.length}`);
@@ -423,11 +526,9 @@ async function runAnswerQuestionsFlow(context, jd, tabId, pdfBase64, pdfMimeType
   }
 
   // Build QA prompt and call Gemini
-  const hasPdf = !!pdfBase64;
-  const prompt = buildQAPrompt(context, jd, questionFields, hasPdf);
+  const hasPdf  = !!pdfBase64;
+  const prompt  = buildQAPrompt(enrichedContext, jd, questionFields, hasPdf);
 
-  // Reuse callGeminiApi but with QA-specific prompt already embedded
-  // We call it directly with a fake field list wrapping our question fields
   const apiKey  = await getApiKey();
   const endpoint = `${GEMINI_API_BASE}/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
 
@@ -473,14 +574,10 @@ async function runAnswerQuestionsFlow(context, jd, tabId, pdfBase64, pdfMimeType
   console.log('[AI Form Filler BG] QA mapping from Gemini:', mapping);
 
   // Fill only the question fields
-  const pdfData = pdfBase64
-    ? { base64: pdfBase64, mimeType: pdfMimeType, fileName: pdfFileName }
-    : null;
-
   const fillResponse = await sendToContentScript(tabId, {
-    action: 'FILL_FORM',
+    action:     'FILL_FORM',
     mapping,
-    fields:  questionFields,
+    fields:     questionFields,
     pdfBase64,
     pdfMimeType,
     pdfFileName,
@@ -499,13 +596,22 @@ async function runAnswerQuestionsFlow(context, jd, tabId, pdfBase64, pdfMimeType
 /**
  * Listen for messages from the popup.
  * Handles:
- * - FILL_REQUEST: orchestrate the full form-fill flow
- * - SAVE_API_KEY: save API key to local storage
- * - GET_API_KEY_STATUS: check if API key is configured
+ * - FILL_REQUEST:        orchestrate the full form-fill flow
+ * - ANSWER_QUESTIONS:    write + fill open-ended answers
+ * - SAVE_API_KEY:        save Gemini API key to local storage
+ * - GET_API_KEY_STATUS:  check if Gemini API key is configured
+ *
+ * ── NEW auth / profile message handlers ──
+ * - LOGIN:               email+password → backend → store JWT
+ * - LOGOUT:              clear JWT + cache
+ * - GET_AUTH_STATUS:     check if JWT is stored
+ * - SYNC_PROFILE:        force-refresh profile cache from backend
+ * - SAVE_BACKEND_URL:    persist backend URL setting
  */
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   console.log('[AI Form Filler BG] Message received:', message.action);
 
+  // ── Gemini API key ──────────────────────────────────────────────────────────
   if (message.action === 'SAVE_API_KEY') {
     chrome.storage.local.set({ apiKey: message.apiKey }, () => {
       sendResponse({ success: true });
@@ -520,12 +626,74 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  // ── Backend URL ─────────────────────────────────────────────────────────────
+  if (message.action === 'SAVE_BACKEND_URL') {
+    chrome.storage.local.set({ backendUrl: message.url }, () => {
+      sendResponse({ success: true });
+    });
+    return true;
+  }
+
+  // ── Auth: Login ─────────────────────────────────────────────────────────────
+  if (message.action === 'LOGIN') {
+    const { email, password } = message;
+    (async () => {
+      try {
+        const userData = await login(email, password);
+        sendResponse({ success: true, user: userData.user });
+      } catch (err) {
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
+    return true;
+  }
+
+  // ── Auth: Logout ────────────────────────────────────────────────────────────
+  if (message.action === 'LOGOUT') {
+    (async () => {
+      await clearAuthToken();
+      sendResponse({ success: true });
+    })();
+    return true;
+  }
+
+  // ── Auth: Status ────────────────────────────────────────────────────────────
+  if (message.action === 'GET_AUTH_STATUS') {
+    (async () => {
+      const token = await getAuthToken();
+      sendResponse({ isLoggedIn: !!token });
+    })();
+    return true;
+  }
+
+  // ── Sync Profile ─────────────────────────────────────────────────────────────
+  if (message.action === 'SYNC_PROFILE') {
+    (async () => {
+      try {
+        const formData = await fetchProfileFormData(true /* forceRefresh */);
+        sendResponse({ success: true, fieldCount: Object.keys(formData).length });
+      } catch (err) {
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
+    return true;
+  }
+
+  // ── Form Fill ───────────────────────────────────────────────────────────────
   if (message.action === 'FILL_REQUEST') {
-    const { context, pdfBase64 = null, pdfMimeType = 'application/pdf', pdfFileName = 'document.pdf' } = message;
+    const {
+      context     = '',
+      pdfBase64   = null,
+      pdfMimeType = 'application/pdf',
+      pdfFileName = 'document.pdf',
+    } = message;
 
     chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
       const activeTab = tabs[0];
-      if (!activeTab?.id) { sendResponse({ success: false, error: 'No active tab found.' }); return; }
+      if (!activeTab?.id) {
+        sendResponse({ success: false, error: 'No active tab found.' });
+        return;
+      }
       try {
         const result = await runFormFillFlow(context, activeTab.id, pdfBase64, pdfMimeType, pdfFileName);
         sendResponse({ success: true, ...result });
@@ -537,20 +705,26 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  // ── Answer Questions ─────────────────────────────────────────────────────────
   if (message.action === 'ANSWER_QUESTIONS') {
     const {
-      context    = '',
-      jd         = '',
-      pdfBase64  = null,
+      context     = '',
+      jd          = '',
+      pdfBase64   = null,
       pdfMimeType = 'application/pdf',
       pdfFileName = 'document.pdf',
     } = message;
 
     chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
       const activeTab = tabs[0];
-      if (!activeTab?.id) { sendResponse({ success: false, error: 'No active tab found.' }); return; }
+      if (!activeTab?.id) {
+        sendResponse({ success: false, error: 'No active tab found.' });
+        return;
+      }
       try {
-        const result = await runAnswerQuestionsFlow(context, jd, activeTab.id, pdfBase64, pdfMimeType, pdfFileName);
+        const result = await runAnswerQuestionsFlow(
+          context, jd, activeTab.id, pdfBase64, pdfMimeType, pdfFileName
+        );
         sendResponse({ success: true, ...result });
       } catch (err) {
         console.error('[AI Form Filler BG] QA flow error:', err);
@@ -561,13 +735,4 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 });
 
-// Pre-seed the default Gemini API key on first install (if not already set)
-chrome.storage.local.get(['apiKey'], (result) => {
-  if (!result.apiKey) {
-    chrome.storage.local.set({ apiKey: DEFAULT_API_KEY }, () => {
-      console.log('[AI Form Filler BG] Default Gemini API key pre-seeded.');
-    });
-  }
-});
-
-console.log('[AI Form Filler] Background service worker started (Gemini powered).');
+console.log('[AI Form Filler] Background service worker started (Gemini + Backend powered).');

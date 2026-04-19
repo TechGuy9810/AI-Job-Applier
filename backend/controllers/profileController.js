@@ -13,6 +13,7 @@ import {
   updateProfileService,
   deleteProfileService,
 } from '../services/profileService.js';
+import { profileToFormData } from '../utils/profileToFormData.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/profile
@@ -123,6 +124,28 @@ export const deleteProfile = asyncHandler(async (req, res) => {
   } catch (err) {
     if (err.message === 'PROFILE_NOT_FOUND') {
       return sendNotFound(res, 'Profile not found');
+    }
+    throw err;
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/profile/form-data
+// Returns the profile as a flat, alias-expanded key→value map for form filling.
+// The extension consumes this directly — every common synonym of a field is
+// emitted as a separate key so the fuzzy-matcher always finds a deterministic
+// match before Gemini is even consulted.
+// ─────────────────────────────────────────────────────────────────────────────
+export const getProfileFormData = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    const profile = await getProfileService(userId);
+    const formData = profileToFormData(profile);
+    return sendSuccess(res, { formData }, 'Profile form data fetched successfully');
+  } catch (err) {
+    if (err.message === 'PROFILE_NOT_FOUND') {
+      return sendNotFound(res, 'Profile not found — please complete your profile first');
     }
     throw err;
   }
