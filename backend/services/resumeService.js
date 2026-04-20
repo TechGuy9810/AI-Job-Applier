@@ -17,29 +17,6 @@ export const getResumeByIdService = async (userId, resumeId) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CREATE
-// Auto-increments version based on how many resumes user already has.
-// If is_primary=true, demotes all other resumes for this user first.
-// ─────────────────────────────────────────────────────────────────────────────
-export const createResumeService = async (userId, data) => {
-  const count = await Resume.countDocuments({ user_id: userId });
-  const version = count + 1;
-
-  if (data.is_primary) {
-    // demote existing primaries
-    await Resume.updateMany({ user_id: userId }, { $set: { is_primary: false } });
-  }
-
-  const resume = await Resume.create({
-    user_id: userId,
-    version,
-    ...data,
-  });
-
-  return resume;
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
 // UPDATE (label, file_url, is_primary)
 // ─────────────────────────────────────────────────────────────────────────────
 export const updateResumeService = async (userId, resumeId, data) => {

@@ -1,7 +1,6 @@
 import asyncHandler from '../utils/asyncHandler.js';
 import {
   sendSuccess,
-  sendCreated,
   sendNotFound,
   sendBadRequest,
 } from '../utils/response.js';
@@ -24,13 +23,6 @@ export const getResumeById = asyncHandler(async (req, res) => {
   }
 });
 
-export const createResume = asyncHandler(async (req, res) => {
-  const { file_url, label, is_primary } = req.body;
-  if (!file_url) return sendBadRequest(res, 'file_url is required');
-
-  const resume = await resumeService.createResumeService(req.user.id, { file_url, label, is_primary });
-  return sendCreated(res, resume, 'Resume created successfully');
-});
 
 export const updateResume = asyncHandler(async (req, res) => {
   const { file_url, label, is_primary } = req.body;
