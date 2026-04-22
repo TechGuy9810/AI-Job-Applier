@@ -97,6 +97,3 @@ graph LR
 3. Click on the **AI Form Filler** extension icon.
 4. Let the AI analyze the form and inject your work history, education, and standard answers efficiently.
 
-## 🛡️ License
-
-This project is licensed under the MIT License.

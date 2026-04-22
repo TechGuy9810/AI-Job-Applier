@@ -1,6 +1,28 @@
 import Resume from '../models/Resume.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CREATE
+// ─────────────────────────────────────────────────────────────────────────────
+export const createResumeService = async (userId, data) => {
+  if (data.is_primary) {
+    await Resume.updateMany({ user_id: userId }, { $set: { is_primary: false } });
+  } else {
+    const existingCount = await Resume.countDocuments({ user_id: userId });
+    if (existingCount === 0) {
+      data.is_primary = true;
+    }
+  }
+
+  const resume = new Resume({
+    ...data,
+    user_id: userId,
+  });
+
+  await resume.save();
+  return resume;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // GET ALL — all resumes for a user
 // ─────────────────────────────────────────────────────────────────────────────
 export const getAllResumesService = async (userId) => {

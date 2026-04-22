@@ -1,49 +1,70 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
-/**
- * Resume — one-to-many with User.
- * Each document represents one uploaded resume file (PDF, DOCX, etc.)
- * stored externally (S3 / GCS) with a signed or public URL.
- */
-const resumeSchema = new mongoose.Schema(
+const { Schema, Types } = mongoose;
+
+const experienceSchema = new Schema(
   {
-    user_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+    company: { type: String, required: true },
+    role: { type: String, required: true },
+    duration: { type: String },
+    points: [{ type: String }]
+  },
+  { _id: false }
+);
+
+const projectSchema = new Schema(
+  {
+    name: { type: String, required: true },
+    tech: [{ type: String }],
+    points: [{ type: String }]
+  },
+  { _id: false }
+);
+
+const educationSchema = new Schema(
+  {
+    college: { type: String, required: true },
+    degree: { type: String },
+    year: { type: String }
+  },
+  { _id: false }
+);
+
+// 🔹 Main Resume Schema
+
+const resumeSchema = new Schema(
+  {
+    userId: {
+      type: Types.ObjectId,
+      ref: "User",
       required: true,
-      index: true,
+      index: true
     },
 
-    // Link to the stored file (S3 / GCS pre-signed or public URL)
-    file_url: {
+    title: {
       type: String,
       required: true,
-      trim: true,
+      default: "My Resume"
     },
 
-    // Human-readable label — e.g. "Backend Dev Resume", "Generic"
-    label: {
+    data: {
+      skills: [{ type: String }],
+
+      experience: [experienceSchema],
+
+      projects: [projectSchema],
+
+      education: [educationSchema]
+    },
+
+    pdfUrl: {
       type: String,
-      trim: true,
-      default: 'My Resume',
-    },
-
-    // Only one resume per user can be primary at a time
-    is_primary: {
-      type: Boolean,
-      default: false,
-    },
-
-    // Monotonically increasing integer managed in service layer
-    version: {
-      type: Number,
-      default: 1,
-      min: 1,
-    },
+      default: null
+    }
   },
   {
-    timestamps: true, // createdAt, updatedAt
+    timestamps: true // adds createdAt & updatedAt
   }
 );
 
-export default mongoose.model('Resume', resumeSchema);
+export default mongoose.model("Resume", resumeSchema);

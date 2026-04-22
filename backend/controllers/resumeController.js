@@ -6,6 +6,21 @@ import {
 } from '../utils/response.js';
 import * as resumeService from '../services/resumeService.js';
 
+export const createResume = asyncHandler(async (req, res) => {
+  const { file_url, label, is_primary } = req.body;
+  if (!file_url) {
+    return sendBadRequest(res, 'file_url is required');
+  }
+
+  const resume = await resumeService.createResumeService(req.user.id, {
+    file_url,
+    label,
+    is_primary,
+  });
+
+  return sendSuccess(res, resume, 'Resume created successfully', 201);
+});
+
 export const getAllResumes = asyncHandler(async (req, res) => {
   const resumes = await resumeService.getAllResumesService(req.user.id);
   return sendSuccess(res, resumes, 'Resumes fetched successfully');
