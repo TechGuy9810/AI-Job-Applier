@@ -34,32 +34,38 @@ const educationSchema = new Schema(
 
 const resumeSchema = new Schema(
   {
-    userId: {
+    user_id: {
       type: Types.ObjectId,
       ref: "User",
       required: true,
       index: true
     },
-
-    title: {
+    label: {
       type: String,
       required: true,
       default: "My Resume"
     },
-
-    data: {
-      skills: [{ type: String }],
-
-      experience: [experienceSchema],
-
-      projects: [projectSchema],
-
-      education: [educationSchema]
+    is_primary: {
+      type: Boolean,
+      default: false
     },
-
-    pdfUrl: {
+    file_url: {
       type: String,
       default: null
+    },
+    pdfBase64: { // We store the base64 just in case they need to upload the actual file to forms later
+      type: String,
+      default: null
+    },
+    mimeType: {
+      type: String,
+      default: "application/pdf"
+    },
+    data: {
+      skills: [{ type: String }],
+      experience: [experienceSchema],
+      projects: [projectSchema],
+      education: [educationSchema]
     }
   },
   {

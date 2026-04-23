@@ -5,6 +5,45 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AI Form Filler</title>
   <link rel="stylesheet" href="popup.css" />
+  <style>
+    /* Tabs Navigation */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-base);
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 10px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-weight: 600;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all var(--transition);
+    }
+    .tab-btn.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    
+    /* Profile Form Grid */
+    .profile-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .profile-grid .field-group.full-width {
+      grid-column: span 2;
+    }
+  </style>
 </head>
 <body>
 
@@ -15,57 +54,48 @@
       <h1 class="header-title">AI Form Filler</h1>
       <p class="header-subtitle">Fill any form with your data instantly</p>
     </div>
-    <!-- API key status badge -->
-    <div id="apiStatusBadge" class="status-badge status-badge--checking">
+    <div id="authStatusBadge" class="status-badge status-badge--checking">
       <span class="status-dot"></span>
-      <span id="apiStatusText">Checking…</span>
+      <span id="authStatusText">Checking…</span>
     </div>
   </header>
 
-  <!-- ══ MAIN CONTENT ══════════════════════════════════════ -->
-  <main class="main">
+  <!-- ══ TABS ══════════════════════════════════════════════ -->
+  <div class="tabs">
+    <button id="tabHome" class="tab-btn active">Home</button>
+    <button id="tabProfile" class="tab-btn">My Profile</button>
+  </div>
 
-    <!-- Context textarea -->
+  <!-- ══ HOME TAB ══════════════════════════════════════════ -->
+  <main id="viewHome" class="main tab-content active">
+
+    <!-- Active Resume Info -->
     <div class="field-group">
-      <label class="label" for="contextInput">
-        Extra Context
-        <span class="label-hint">Optional — supplements your profile data</span>
-      </label>
-      <textarea
-        id="contextInput"
-        class="textarea"
-        placeholder="Add any extra details not in your profile…
-Example:
-LinkedIn: https://linkedin.com/in/you
-GitHub: https://github.com/you
-Availability: Immediate
-Or paste a job-specific note here."
-        rows="4"
-      ></textarea>
-      <div class="char-counter"><span id="charCount">0</span> characters</div>
+      <label class="label">Primary Resume</label>
+      <div id="activeResumeInfo" class="pdf-file-info pdf-file-info--hidden" style="display:flex; justify-content:space-between;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="pdf-file-icon">📎</span>
+          <span id="activeResumeName" class="pdf-file-name">document.pdf</span>
+        </div>
+        <span class="status-badge status-badge--ok" style="font-size:9px;">Active</span>
+      </div>
+      <div id="noResumeWarning" class="result-card result-card--info">
+        <span class="result-card__icon">⚠️</span> No resume found. Please upload a resume below (Mandatory).
+      </div>
     </div>
 
-    <!-- PDF Upload -->
+    <!-- Resume Upload Dropzone -->
     <div class="field-group">
       <label class="label">
-        Upload PDF <span class="label-hint">Resume, ID, application — any document</span>
+        Upload Resume <span class="label-hint">PDF up to 20MB</span>
       </label>
-
-      <!-- Drop zone -->
       <div id="pdfDropZone" class="pdf-drop-zone" role="button" tabindex="0" aria-label="Upload PDF file">
         <input type="file" id="pdfFileInput" accept="application/pdf" hidden />
         <div id="pdfDropIcon" class="pdf-drop-icon">📄</div>
         <div id="pdfDropText" class="pdf-drop-text">
           <strong>Drop PDF here</strong> or <span class="pdf-drop-link">click to browse</span>
         </div>
-        <div id="pdfDropSub" class="pdf-drop-sub">Supports PDF up to 20 MB</div>
-      </div>
-
-      <!-- File selected state -->
-      <div id="pdfFileInfo" class="pdf-file-info pdf-file-info--hidden">
-        <span class="pdf-file-icon">📎</span>
-        <span id="pdfFileName" class="pdf-file-name">document.pdf</span>
-        <button id="pdfClearBtn" class="pdf-clear-btn" title="Remove PDF">✕</button>
+        <div id="pdfDropSub" class="pdf-drop-sub">This will be set as your primary resume</div>
       </div>
     </div>
 
@@ -81,8 +111,7 @@ Or paste a job-specific note here."
         <textarea
           id="jdInput"
           class="textarea textarea--teal"
-          placeholder="Paste the job description or candidate requirements here…
-Gemini will use this to write tailored answers to behavioral & personal questions."
+          placeholder="Paste the job description here…"
           rows="6"
         ></textarea>
         <div class="char-counter"><span id="jdCharCount">0</span> characters</div>
@@ -91,11 +120,11 @@ Gemini will use this to write tailored answers to behavioral & personal question
 
     <!-- Action buttons row -->
     <div class="btn-row">
-      <button id="fillBtn" class="btn btn--primary">
+      <button id="fillBtn" class="btn btn--primary" disabled>
         <span class="btn-icon">⚡</span>
         <span id="fillBtnText">Fill Fields</span>
       </button>
-      <button id="answerBtn" class="btn btn--teal">
+      <button id="answerBtn" class="btn btn--teal" disabled>
         <span class="btn-icon">✍️</span>
         <span id="answerBtnText">Answer Questions</span>
       </button>
@@ -106,60 +135,96 @@ Gemini will use this to write tailored answers to behavioral & personal question
 
   </main>
 
+  <!-- ══ PROFILE TAB ═══════════════════════════════════════ -->
+  <main id="viewProfile" class="main tab-content">
+    
+    <!-- Extract from Resume action -->
+    <div class="field-group" style="margin-bottom: 12px;">
+      <button id="extractResumeBtn" class="btn btn--secondary" style="width: 100%;">
+        <span class="btn-icon">🪄</span> Auto-fill from Primary Resume
+      </button>
+      <div id="extractResultCard" class="result-card result-card--hidden" style="margin-top:8px;"></div>
+    </div>
+
+    <form id="profileForm" style="display:flex; flex-direction:column; gap:12px;">
+      <!-- Personal Info -->
+      <div class="profile-grid">
+        <div class="field-group full-width">
+          <label class="label">Full Name</label>
+          <input type="text" id="prof_full_name" class="input" />
+        </div>
+        <div class="field-group">
+          <label class="label">Email</label>
+          <input type="email" id="prof_email" class="input" />
+        </div>
+        <div class="field-group">
+          <label class="label">Phone</label>
+          <input type="text" id="prof_phone" class="input" />
+        </div>
+      </div>
+
+      <!-- Professional / Education -->
+      <div class="profile-grid">
+        <div class="field-group full-width">
+          <label class="label">Highest Education</label>
+          <select id="prof_highest_education" class="input">
+            <option value="">Select...</option>
+            <option value="high_school">High School</option>
+            <option value="diploma">Diploma</option>
+            <option value="bachelors">Bachelors</option>
+            <option value="masters">Masters</option>
+            <option value="phd">PhD</option>
+            <option value="postdoc">Postdoc</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="field-group full-width">
+          <label class="label">Degree</label>
+          <input type="text" id="prof_degree" class="input" placeholder="e.g. B.Tech Computer Science" />
+        </div>
+        <div class="field-group">
+          <label class="label">Current Salary</label>
+          <input type="number" id="prof_current_salary" class="input" />
+        </div>
+        <div class="field-group">
+          <label class="label">Expected Salary</label>
+          <input type="number" id="prof_expected_salary" class="input" />
+        </div>
+      </div>
+
+      <!-- Links -->
+      <div class="field-group">
+        <label class="label">LinkedIn URL</label>
+        <input type="url" id="prof_linkedin_url" class="input" />
+      </div>
+      <div class="field-group">
+        <label class="label">GitHub URL</label>
+        <input type="url" id="prof_github_url" class="input" />
+      </div>
+
+      <button type="submit" id="saveProfileBtn" class="btn btn--primary" style="margin-top: 8px;">
+        💾 Save Profile
+      </button>
+      <div id="profileResultCard" class="result-card result-card--hidden"></div>
+    </form>
+  </main>
+
   <!-- ══ SETTINGS PANEL ════════════════════════════════════ -->
   <section class="settings-panel">
     <button id="settingsToggle" class="settings-toggle" aria-expanded="false">
-      <span class="settings-toggle-icon">⚙</span> Settings
+      <span class="settings-toggle-icon">⚙</span> Account Settings
       <span class="settings-toggle-arrow">▾</span>
     </button>
 
     <div id="settingsBody" class="settings-body settings-body--collapsed">
-
-      <!-- ── ACCOUNT SECTION ──────────────────────────────── -->
       <div class="settings-section">
-        <div class="settings-section-header">
-          <span class="settings-section-icon">👤</span>
-          <span class="settings-section-title">Account</span>
-          <!-- Auth status badge -->
-          <div id="authStatusBadge" class="status-badge status-badge--checking" style="margin-left:auto;">
-            <span class="status-dot"></span>
-            <span id="authStatusText">Checking…</span>
-          </div>
-        </div>
-
-        <!-- Backend URL -->
-        <label class="label" for="backendUrlInput">Backend URL</label>
-        <div class="api-key-row">
-          <input
-            id="backendUrlInput"
-            type="text"
-            class="input"
-            placeholder="http://localhost:3000"
-            autocomplete="off"
-            spellcheck="false"
-          />
-          <button id="saveBackendUrlBtn" class="btn btn--icon" title="Save URL">💾</button>
-        </div>
-
         <!-- Login form (shown when logged out) -->
         <div id="loginSection">
           <label class="label" for="loginEmail" style="margin-top:10px;">Email</label>
-          <input
-            id="loginEmail"
-            type="email"
-            class="input"
-            placeholder="you@example.com"
-            autocomplete="email"
-          />
+          <input id="loginEmail" type="email" class="input" placeholder="you@example.com" autocomplete="email" />
           <label class="label" for="loginPassword" style="margin-top:8px;">Password</label>
           <div class="api-key-row">
-            <input
-              id="loginPassword"
-              type="password"
-              class="input"
-              placeholder="••••••••"
-              autocomplete="current-password"
-            />
+            <input id="loginPassword" type="password" class="input" placeholder="••••••••" autocomplete="current-password" />
             <button id="toggleLoginPwVisibility" class="btn btn--icon" title="Show/Hide">👁</button>
           </div>
           <button id="loginBtn" class="btn btn--secondary" style="margin-top:8px;">Login</button>
@@ -168,46 +233,16 @@ Gemini will use this to write tailored answers to behavioral & personal question
         <!-- Logged-in actions (shown when logged in) -->
         <div id="loggedInSection" style="display:none;">
           <div class="btn-row" style="margin-top:8px;">
-            <button id="syncProfileBtn" class="btn btn--secondary">
-              <span id="syncProfileBtnText">🔄 Sync Profile</span>
-            </button>
-            <button id="logoutBtn" class="btn btn--icon" title="Logout" style="color:#f87171;">⬡ Logout</button>
+            <button id="logoutBtn" class="btn btn--icon" title="Logout" style="color:#f87171; width:100%;">⬡ Logout</button>
           </div>
-          <p class="settings-note" id="syncProfileNote" style="display:none;"></p>
         </div>
       </div>
-
-      <div class="settings-divider"></div>
-
-      <!-- ── GEMINI API KEY SECTION ───────────────────────── -->
-      <div class="settings-section">
-        <div class="settings-section-header">
-          <span class="settings-section-icon">🤖</span>
-          <span class="settings-section-title">Gemini API Key</span>
-        </div>
-        <div class="api-key-row">
-          <input
-            id="apiKeyInput"
-            type="password"
-            class="input"
-            placeholder="AIza…"
-            autocomplete="off"
-            spellcheck="false"
-          />
-          <button id="toggleApiVisibility" class="btn btn--icon" title="Show/Hide">👁</button>
-        </div>
-        <button id="saveApiKeyBtn" class="btn btn--secondary">Save Key</button>
-        <p class="settings-note">
-          Key is stored locally in your browser. Sent only to Google Gemini API.
-        </p>
-      </div>
-
     </div>
   </section>
 
   <!-- ══ FOOTER ════════════════════════════════════════════ -->
   <footer class="footer">
-    Powered by Google Gemini 2.5 Flash · Manifest V3
+    Powered by AI Form Filler · Manifest V3
   </footer>
 
   <script src="popup.js"></script>

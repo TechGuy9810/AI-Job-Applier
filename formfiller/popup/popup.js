@@ -1,161 +1,193 @@
 /**
  * popup.js
  * Controls all popup UI interactions:
- * - Context textarea and character counter
- * - Fill button with loading state
- * - API key management (save, reveal, status check)
- * - Settings panel toggle
- * - Result/status display
  */
 
 // ─────────────────────────────────────────────
 // DOM REFERENCES
 // ─────────────────────────────────────────────
-const contextInput        = document.getElementById('contextInput');
-const charCount           = document.getElementById('charCount');
-const fillBtn             = document.getElementById('fillBtn');
-const fillBtnText         = document.getElementById('fillBtnText');
-const resultCard          = document.getElementById('resultCard');
+const tabHome = document.getElementById('tabHome');
+const tabProfile = document.getElementById('tabProfile');
+const viewHome = document.getElementById('viewHome');
+const viewProfile = document.getElementById('viewProfile');
 
-const settingsToggle      = document.getElementById('settingsToggle');
-const settingsBody        = document.getElementById('settingsBody');
-const apiKeyInput         = document.getElementById('apiKeyInput');
-const toggleApiVisibility = document.getElementById('toggleApiVisibility');
-const saveApiKeyBtn       = document.getElementById('saveApiKeyBtn');
+const activeResumeInfo = document.getElementById('activeResumeInfo');
+const activeResumeName = document.getElementById('activeResumeName');
+const noResumeWarning = document.getElementById('noResumeWarning');
 
-const apiStatusBadge      = document.getElementById('apiStatusBadge');
-const apiStatusText       = document.getElementById('apiStatusText');
+const pdfDropZone = document.getElementById('pdfDropZone');
+const pdfFileInput = document.getElementById('pdfFileInput');
+const fillBtn = document.getElementById('fillBtn');
+const answerBtn = document.getElementById('answerBtn');
+const resultCard = document.getElementById('resultCard');
 
-// PDF upload elements
-const pdfDropZone         = document.getElementById('pdfDropZone');
-const pdfFileInput        = document.getElementById('pdfFileInput');
-const pdfFileInfo         = document.getElementById('pdfFileInfo');
-const pdfFileName         = document.getElementById('pdfFileName');
-const pdfClearBtn         = document.getElementById('pdfClearBtn');
+const jdToggle = document.getElementById('jdToggle');
+const jdBody = document.getElementById('jdBody');
+const jdInput = document.getElementById('jdInput');
+const jdCharCount = document.getElementById('jdCharCount');
 
-// Job Description elements
-const jdToggle            = document.getElementById('jdToggle');
-const jdBody              = document.getElementById('jdBody');
-const jdInput             = document.getElementById('jdInput');
-const jdCharCount         = document.getElementById('jdCharCount');
+const authStatusBadge = document.getElementById('authStatusBadge');
+const authStatusText = document.getElementById('authStatusText');
 
-// Answer Questions button
-const answerBtn           = document.getElementById('answerBtn');
-const answerBtnText       = document.getElementById('answerBtnText');
+const loginSection = document.getElementById('loginSection');
+const loggedInSection = document.getElementById('loggedInSection');
+const loginEmail = document.getElementById('loginEmail');
+const loginPassword = document.getElementById('loginPassword');
+const loginBtn = document.getElementById('loginBtn');
+const logoutBtn = document.getElementById('logoutBtn');
 
-// ── Account / Auth elements ─────────────────────────────────────────────────
-const authStatusBadge        = document.getElementById('authStatusBadge');
-const authStatusText         = document.getElementById('authStatusText');
-const backendUrlInput        = document.getElementById('backendUrlInput');
-const saveBackendUrlBtn      = document.getElementById('saveBackendUrlBtn');
-const loginSection           = document.getElementById('loginSection');
-const loggedInSection        = document.getElementById('loggedInSection');
-const loginEmailInput        = document.getElementById('loginEmail');
-const loginPasswordInput     = document.getElementById('loginPassword');
-const toggleLoginPwVisibility = document.getElementById('toggleLoginPwVisibility');
-const loginBtn               = document.getElementById('loginBtn');
-const logoutBtn              = document.getElementById('logoutBtn');
-const syncProfileBtn         = document.getElementById('syncProfileBtn');
-const syncProfileBtnText     = document.getElementById('syncProfileBtnText');
-const syncProfileNote        = document.getElementById('syncProfileNote');
+// Profile Form Elements
+const profileForm = document.getElementById('profileForm');
+const saveProfileBtn = document.getElementById('saveProfileBtn');
+const extractResumeBtn = document.getElementById('extractResumeBtn');
+const profileResultCard = document.getElementById('profileResultCard');
+const extractResultCard = document.getElementById('extractResultCard');
 
 // ─────────────────────────────────────────────
-// PDF STATE
+// TAB SWITCHING
 // ─────────────────────────────────────────────
+tabHome.addEventListener('click', () => {
+  tabHome.classList.add('active');
+  tabProfile.classList.remove('active');
+  viewHome.classList.add('active');
+  viewProfile.classList.remove('active');
+});
 
-/** Holds the currently selected PDF as a base64 string (or null). */
-let currentPdfBase64    = null;
-let currentPdfMimeType  = 'application/pdf';
-let currentPdfFileName  = 'document.pdf';
+tabProfile.addEventListener('click', () => {
+  tabProfile.classList.add('active');
+  tabHome.classList.remove('active');
+  viewProfile.classList.add('active');
+  viewHome.classList.remove('active');
+  loadProfile();
+});
 
 // ─────────────────────────────────────────────
-// PDF UPLOAD — HELPERS
+// AUTHENTICATION
 // ─────────────────────────────────────────────
+function setAuthStatusBadge(state, label) {
+  authStatusBadge.className = `status-badge status-badge--${state}`;
+  authStatusText.textContent = label;
+}
 
-/**
- * Reads a File object and returns its base64-encoded string.
- * @param {File} file
- * @returns {Promise<string>} base64 data (no prefix)
- */
-function readFileAsBase64(file) {
+function checkAuthStatus() {
+  chrome.runtime.sendMessage({ action: 'GET_AUTH_STATUS' }, (response) => {
+    if (chrome.runtime.lastError || !response || !response.isLoggedIn) {
+      setAuthStatusBadge('missing', 'Not logged in');
+      loginSection.style.display = '';
+      loggedInSection.style.display = 'none';
+      setResumeUI(false);
+    } else {
+      setAuthStatusBadge('ok', 'Logged in ✓');
+      loginSection.style.display = 'none';
+      loggedInSection.style.display = '';
+      checkResumes();
+    }
+  });
+}
+
+loginBtn.addEventListener('click', () => {
+  const email = loginEmail.value.trim();
+  const password = loginPassword.value;
+  if (!email || !password) return;
+
+  loginBtn.textContent = 'Logging in…';
+  loginBtn.disabled = true;
+
+  chrome.runtime.sendMessage({ action: 'LOGIN', email, password }, (res) => {
+    loginBtn.textContent = 'Login';
+    loginBtn.disabled = false;
+    if (res?.success) {
+      checkAuthStatus();
+    } else {
+      alert(`Login failed: ${res?.error}`);
+    }
+  });
+});
+
+logoutBtn.addEventListener('click', () => {
+  chrome.runtime.sendMessage({ action: 'LOGOUT' }, () => {
+    checkAuthStatus();
+  });
+});
+
+document.getElementById('toggleLoginPwVisibility').addEventListener('click', (e) => {
+  const isPassword = loginPassword.type === 'password';
+  loginPassword.type = isPassword ? 'text' : 'password';
+  e.target.textContent = isPassword ? '🙈' : '👁';
+});
+
+// ─────────────────────────────────────────────
+// RESUME UPLOAD & CHECK
+// ─────────────────────────────────────────────
+function setResumeUI(hasResume, name = '') {
+  if (hasResume) {
+    activeResumeInfo.style.display = 'flex';
+    activeResumeInfo.classList.remove('pdf-file-info--hidden');
+    activeResumeName.textContent = name;
+    noResumeWarning.style.display = 'none';
+    fillBtn.disabled = false;
+    answerBtn.disabled = false;
+  } else {
+    activeResumeInfo.style.display = 'none';
+    activeResumeInfo.classList.add('pdf-file-info--hidden');
+    noResumeWarning.style.display = 'flex';
+    fillBtn.disabled = true;
+    answerBtn.disabled = true;
+  }
+}
+
+function checkResumes() {
+  chrome.runtime.sendMessage({ action: 'CHECK_RESUMES' }, (res) => {
+    if (res?.success && res.hasResume) {
+      setResumeUI(true, res.resume.label || 'document.pdf');
+    } else {
+      setResumeUI(false);
+    }
+  });
+}
+
+function readFileAsDataURL(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => {
-      // result is "data:application/pdf;base64,XXXX" — strip the prefix
-      const base64 = reader.result.split(',')[1];
-      resolve(base64);
-    };
+    reader.onload = () => resolve(reader.result);
     reader.onerror = () => reject(new Error('Failed to read PDF file.'));
     reader.readAsDataURL(file);
   });
 }
 
-/**
- * Processes a selected PDF File: validates, reads, and updates UI.
- * @param {File} file
- */
-async function handlePdfFile(file) {
+async function handlePdfUpload(file) {
   if (!file || file.type !== 'application/pdf') {
-    showResult('<span class="result-card__icon">⚠️</span> Please upload a valid PDF file.', 'error');
-    return;
-  }
-
-  const MAX_MB = 20;
-  if (file.size > MAX_MB * 1024 * 1024) {
-    showResult(`<span class="result-card__icon">⚠️</span> PDF exceeds ${MAX_MB} MB limit.`, 'error');
+    alert('Please upload a valid PDF file.');
     return;
   }
 
   try {
-    currentPdfBase64   = await readFileAsBase64(file);
-    currentPdfMimeType = file.type;
-    currentPdfFileName = file.name;
-
-    // Update UI: hide drop zone, show file info bar
-    pdfDropZone.classList.add('pdf-drop-zone--has-file');
-    pdfFileInfo.classList.remove('pdf-file-info--hidden');
-    pdfFileName.textContent = file.name;
-
-    console.log(`[AI Form Filler] PDF loaded: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`);
-  } catch (err) {
-    showResult(`<span class="result-card__icon">❌</span> ${escapeHtml(err.message)}`, 'error');
+    const fileData = await readFileAsDataURL(file);
+    chrome.runtime.sendMessage({
+      action: 'UPLOAD_RESUME',
+      fileData,
+      fileName: file.name,
+      mimeType: file.type
+    }, (res) => {
+      if (res?.success) {
+        checkResumes();
+        alert('Resume uploaded and set as primary!');
+      } else {
+        alert(`Failed to upload resume: ${res?.error}`);
+      }
+    });
+  } catch (e) {
+    alert(e.message);
   }
 }
 
-/**
- * Clears the selected PDF and resets the upload zone.
- */
-function clearPdf() {
-  currentPdfBase64   = null;
-  currentPdfFileName = 'document.pdf';
-  pdfFileInput.value = '';
-  pdfDropZone.classList.remove('pdf-drop-zone--has-file');
-  pdfFileInfo.classList.add('pdf-file-info--hidden');
-  pdfFileName.textContent = '';
-}
-
-// ─────────────────────────────────────────────
-// PDF UPLOAD — EVENT LISTENERS
-// ─────────────────────────────────────────────
-
-// Click on drop zone → open file picker
 pdfDropZone.addEventListener('click', () => pdfFileInput.click());
-pdfDropZone.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' || e.key === ' ') pdfFileInput.click();
-});
-
-// File picker changed
 pdfFileInput.addEventListener('change', (e) => {
-  if (e.target.files[0]) handlePdfFile(e.target.files[0]);
+  if (e.target.files[0]) handlePdfUpload(e.target.files[0]);
 });
 
-// Drag & Drop
-pdfDropZone.addEventListener('dragenter', (e) => {
-  e.preventDefault();
-  pdfDropZone.classList.add('pdf-drop-zone--dragover');
-});
 pdfDropZone.addEventListener('dragover', (e) => {
-  e.preventDefault(); // Required to allow drop
+  e.preventDefault();
   pdfDropZone.classList.add('pdf-drop-zone--dragover');
 });
 pdfDropZone.addEventListener('dragleave', () => {
@@ -165,112 +197,65 @@ pdfDropZone.addEventListener('drop', (e) => {
   e.preventDefault();
   pdfDropZone.classList.remove('pdf-drop-zone--dragover');
   const file = e.dataTransfer.files[0];
-  if (file) handlePdfFile(file);
-});
-
-// Clear PDF button
-pdfClearBtn.addEventListener('click', (e) => {
-  e.stopPropagation();
-  clearPdf();
-  hideResult();
+  if (file) handlePdfUpload(file);
 });
 
 // ─────────────────────────────────────────────
-// RESULT CARD HELPERS
+// FILLING / ANSWERING
 // ─────────────────────────────────────────────
-
-/**
- * Displays the result card with a message and optional type.
- * @param {string} html - Inner HTML content for the card
- * @param {'success'|'error'|'info'} type - Visual style
- */
 function showResult(html, type = 'info') {
   resultCard.innerHTML = html;
   resultCard.className = `result-card result-card--${type}`;
 }
-
 function hideResult() {
   resultCard.className = 'result-card result-card--hidden';
 }
 
-// ─────────────────────────────────────────────
-// LOADING STATE
-// ─────────────────────────────────────────────
-
-/**
- * Sets the fill button into a loading state to prevent double clicks.
- */
-function setLoading(isLoading) {
-  fillBtn.disabled   = isLoading;
-  answerBtn.disabled = isLoading;
-  if (isLoading) {
-    fillBtn.classList.add('btn--loading');
-    fillBtnText.textContent = 'Analyzing…';
-    fillBtn.querySelector('.btn-icon').textContent = '';
-  } else {
-    fillBtn.classList.remove('btn--loading');
-    fillBtnText.textContent = 'Fill Fields';
-    fillBtn.querySelector('.btn-icon').textContent = '⚡';
-  }
-}
-
-function setAnswerLoading(isLoading) {
-  answerBtn.disabled = isLoading;
-  fillBtn.disabled   = isLoading;
-  if (isLoading) {
-    answerBtnText.textContent = 'Writing Answers…';
-    answerBtn.querySelector('.btn-icon').textContent = '⏳';
-  } else {
-    answerBtnText.textContent = 'Answer Questions';
-    answerBtn.querySelector('.btn-icon').textContent = '✍️';
-  }
-}
-
-// ─────────────────────────────────────────────
-// API STATUS CHECK
-// ─────────────────────────────────────────────
-
-/**
- * Checks if the API key is saved and updates the status badge accordingly.
- */
-function checkApiKeyStatus() {
-  chrome.runtime.sendMessage({ action: 'GET_API_KEY_STATUS' }, (response) => {
-    if (chrome.runtime.lastError || !response) {
-      setApiStatusBadge('missing', 'No Key');
-      return;
-    }
-    if (response.hasKey) {
-      setApiStatusBadge('ok', 'API Ready');
+fillBtn.addEventListener('click', () => {
+  hideResult();
+  fillBtn.disabled = true;
+  fillBtn.textContent = 'Analyzing…';
+  
+  chrome.runtime.sendMessage({ action: 'FILL_REQUEST' }, (res) => {
+    fillBtn.disabled = false;
+    fillBtn.innerHTML = '<span class="btn-icon">⚡</span> Fill Fields';
+    
+    if (res?.success) {
+      showResult(`
+        <strong>✅ Form filled!</strong>
+        <div class="result-stats">
+          <div class="stat"><span class="stat-value">${res.fieldsMapped}</span><span class="stat-label">Mapped</span></div>
+          <div class="stat"><span class="stat-value">${res.fieldsFilled}</span><span class="stat-label">Filled</span></div>
+        </div>
+      `, 'success');
     } else {
-      setApiStatusBadge('missing', 'No Key');
+      showResult(`❌ Error: ${res?.error}`, 'error');
     }
   });
-}
-
-/**
- * Updates the API status badge visual state.
- */
-function setApiStatusBadge(state, label) {
-  apiStatusBadge.className = `status-badge status-badge--${state}`;
-  apiStatusText.textContent = label;
-}
-
-// ─────────────────────────────────────────────
-// CHARACTER COUNTER
-// ─────────────────────────────────────────────
-
-contextInput.addEventListener('input', () => {
-  charCount.textContent = contextInput.value.length;
 });
 
-// JD char counter
-jdInput.addEventListener('input', () => {
-  jdCharCount.textContent = jdInput.value.length;
+answerBtn.addEventListener('click', () => {
+  hideResult();
+  answerBtn.disabled = true;
+  answerBtn.textContent = 'Writing Answers…';
+  
+  chrome.runtime.sendMessage({ action: 'ANSWER_QUESTIONS', jd: jdInput.value.trim() }, (res) => {
+    answerBtn.disabled = false;
+    answerBtn.innerHTML = '<span class="btn-icon">✍️</span> Answer Questions';
+    
+    if (res?.success) {
+      showResult(`
+        <strong>✍️ Questions answered!</strong>
+        <div class="result-stats">
+          <div class="stat"><span class="stat-value">${res.questionsFound}</span><span class="stat-label">Found</span></div>
+          <div class="stat"><span class="stat-value">${res.questionsFilled}</span><span class="stat-label">Filled</span></div>
+        </div>
+      `, 'success');
+    } else {
+      showResult(`❌ Error: ${res?.error}`, 'error');
+    }
+  });
 });
-
-// ─────────────────────────────────────────────
-// JD PANEL TOGGLE
-// ─────────────────────────────────────────────
 
 jdToggle.addEventListener('click', () => {
   const isExpanded = jdToggle.getAttribute('aria-expanded') === 'true';
@@ -283,448 +268,121 @@ jdToggle.addEventListener('click', () => {
     jdBody.classList.add('jd-body--open');
   }
 });
-
-// ─────────────────────────────────────────────
-// SETTINGS PANEL TOGGLE
-// ─────────────────────────────────────────────
-
-settingsToggle.addEventListener('click', () => {
-  const isExpanded = settingsToggle.getAttribute('aria-expanded') === 'true';
-  settingsToggle.setAttribute('aria-expanded', String(!isExpanded));
-
-  if (isExpanded) {
-    settingsBody.classList.remove('settings-body--open');
-    settingsBody.classList.add('settings-body--collapsed');
-  } else {
-    settingsBody.classList.remove('settings-body--collapsed');
-    settingsBody.classList.add('settings-body--open');
-  }
-});
-
-// ─────────────────────────────────────────────
-// API KEY VISIBILITY TOGGLE
-// ─────────────────────────────────────────────
-
-toggleApiVisibility.addEventListener('click', () => {
-  const isPassword = apiKeyInput.type === 'password';
-  apiKeyInput.type = isPassword ? 'text' : 'password';
-  toggleApiVisibility.textContent = isPassword ? '🙈' : '👁';
-});
-
-// ─────────────────────────────────────────────
-// SAVE API KEY
-// ─────────────────────────────────────────────
-
-saveApiKeyBtn.addEventListener('click', () => {
-  const key = apiKeyInput.value.trim();
-
-  if (!key) {
-    showResult('<span class="result-card__icon">⚠️</span> Please enter a valid API key.', 'error');
-    return;
-  }
-
-  if (!key.startsWith('AIza')) {
-    showResult('<span class="result-card__icon">⚠️</span> Gemini API key should start with "AIza".', 'error');
-    return;
-  }
-
-  chrome.runtime.sendMessage({ action: 'SAVE_API_KEY', apiKey: key }, (response) => {
-    if (chrome.runtime.lastError || !response?.success) {
-      showResult('<span class="result-card__icon">❌</span> Failed to save API key.', 'error');
-      return;
-    }
-    apiKeyInput.value = '';
-    apiKeyInput.type = 'password';
-    toggleApiVisibility.textContent = '👁';
-    setApiStatusBadge('ok', 'API Ready');
-    showResult('<span class="result-card__icon">✅</span> API key saved successfully!', 'success');
-  });
-});
-
-// ─────────────────────────────────────────────
-// ANSWER QUESTIONS — MAIN ACTION
-// ─────────────────────────────────────────────
-
-answerBtn.addEventListener('click', async () => {
-  const context = contextInput.value.trim();
-  const jd      = jdInput.value.trim();
-
-  // Profile data comes from DB; extra context + PDF are both optional
-
-  hideResult();
-  setAnswerLoading(true);
-
-  try {
-    const message = {
-      action:  'ANSWER_QUESTIONS',
-      context: context || '',
-      jd:      jd || '',
-    };
-
-    if (currentPdfBase64) {
-      message.pdfBase64   = currentPdfBase64;
-      message.pdfMimeType = currentPdfMimeType;
-      message.pdfFileName = currentPdfFileName;
-    }
-
-    chrome.runtime.sendMessage(message, (response) => {
-      setAnswerLoading(false);
-
-      if (chrome.runtime.lastError) {
-        showResult(
-          `<span class="result-card__icon">❌</span> Extension error: ${chrome.runtime.lastError.message}`,
-          'error'
-        );
-        return;
-      }
-
-      if (!response?.success) {
-        showResult(
-          `<span class="result-card__icon">❌</span> ${escapeHtml(response?.error || 'Unknown error.')}`,
-          'error'
-        );
-        return;
-      }
-
-      const { questionsFound, questionsFilled } = response;
-      if (questionsFound === 0) {
-        showResult(
-          '<span class="result-card__icon">ℹ️</span> No behavioral / open-ended questions detected on this page.',
-          'info'
-        );
-        return;
-      }
-
-      showResult(
-        `<div>
-          <strong>✍️ Questions answered!</strong>
-          <div class="result-stats">
-            <div class="stat">
-              <span class="stat-value">${questionsFound}</span>
-              <span class="stat-label">Found</span>
-            </div>
-            <div class="stat">
-              <span class="stat-value">${questionsFilled}</span>
-              <span class="stat-label">Filled</span>
-            </div>
-          </div>
-        </div>`,
-        'success'
-      );
-    });
-  } catch (err) {
-    setAnswerLoading(false);
-    showResult(
-      `<span class="result-card__icon">❌</span> Unexpected error: ${escapeHtml(err.message)}`,
-      'error'
-    );
-  }
-});
-
-// ─────────────────────────────────────────────
-// FILL FORM — MAIN ACTION
-// ─────────────────────────────────────────────
-
-fillBtn.addEventListener('click', async () => {
-  const context = contextInput.value.trim();
-
-  // Profile data comes from DB; extra context + PDF are both optional
-
-  hideResult();
-  setLoading(true);
-
-  try {
-    // Build the message payload — include PDF if one was uploaded
-    const message = {
-      action: 'FILL_REQUEST',
-      context: context || '', // May be empty if only PDF was provided
-    };
-
-    if (currentPdfBase64) {
-      message.pdfBase64    = currentPdfBase64;
-      message.pdfMimeType  = currentPdfMimeType;
-      message.pdfFileName  = currentPdfFileName;
-      console.log(`[AI Form Filler] Sending PDF "${currentPdfFileName}" to background...`);
-    }
-
-    // Send fill request to background service worker
-    chrome.runtime.sendMessage(message, (response) => {
-        setLoading(false);
-
-        // Handle case where background didn't respond (e.g., service worker restarted)
-        if (chrome.runtime.lastError) {
-          showResult(
-            `<span class="result-card__icon">❌</span> Extension error: ${chrome.runtime.lastError.message}`,
-            'error'
-          );
-          return;
-        }
-
-        if (!response) {
-          showResult(
-            '<span class="result-card__icon">❌</span> No response from extension. Try refreshing the page.',
-            'error'
-          );
-          return;
-        }
-
-        if (!response.success) {
-          showResult(
-            `<span class="result-card__icon">❌</span> ${escapeHtml(response.error || 'Unknown error occurred.')}`,
-            'error'
-          );
-          return;
-        }
-
-        // Success — show fill statistics
-        const { fieldsFound, fieldsMapped, fieldsFilled, fieldsFailed } = response;
-        showResult(
-          `<div>
-            <strong>✅ Form filled successfully!</strong>
-            <div class="result-stats">
-              <div class="stat">
-                <span class="stat-value">${fieldsFound}</span>
-                <span class="stat-label">Found</span>
-              </div>
-              <div class="stat">
-                <span class="stat-value">${fieldsMapped}</span>
-                <span class="stat-label">Mapped</span>
-              </div>
-              <div class="stat">
-                <span class="stat-value">${fieldsFilled}</span>
-                <span class="stat-label">Filled</span>
-              </div>
-              ${fieldsFailed > 0 ? `<div class="stat"><span class="stat-value">${fieldsFailed}</span><span class="stat-label">Skipped</span></div>` : ''}
-            </div>
-          </div>`,
-          'success'
-        );
-      }
-    );
-  } catch (err) {
-    setLoading(false);
-    showResult(
-      `<span class="result-card__icon">❌</span> Unexpected error: ${escapeHtml(err.message)}`,
-      'error'
-    );
-  }
-});
-
-// ─────────────────────────────────────────────
-// UTILITY: HTML ESCAPE (prevent XSS in result card)
-// ─────────────────────────────────────────────
-
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.appendChild(document.createTextNode(str));
-  return div.innerHTML;
-}
-
-// ─────────────────────────────────────────────
-// AUTH STATUS
-// ─────────────────────────────────────────────
-
-/**
- * Updates the auth status badge in the settings panel.
- * @param {'ok'|'missing'|'checking'} state
- * @param {string} label
- */
-function setAuthStatusBadge(state, label) {
-  authStatusBadge.className = `status-badge status-badge--${state}`;
-  authStatusText.textContent = label;
-}
-
-/**
- * Checks backend auth status and toggles login / logged-in sections.
- */
-function checkAuthStatus() {
-  chrome.runtime.sendMessage({ action: 'GET_AUTH_STATUS' }, (response) => {
-    if (chrome.runtime.lastError || !response) {
-      setAuthStatusBadge('missing', 'Not logged in');
-      loginSection.style.display    = '';
-      loggedInSection.style.display = 'none';
-      return;
-    }
-    if (response.isLoggedIn) {
-      setAuthStatusBadge('ok', 'Logged in ✓');
-      loginSection.style.display    = 'none';
-      loggedInSection.style.display = '';
-    } else {
-      setAuthStatusBadge('missing', 'Not logged in');
-      loginSection.style.display    = '';
-      loggedInSection.style.display = 'none';
-    }
-  });
-}
-
-// ─────────────────────────────────────────────
-// BACKEND URL
-// ─────────────────────────────────────────────
-
-// Load saved backend URL into the input
-chrome.storage.local.get(['backendUrl'], (result) => {
-  backendUrlInput.value = result.backendUrl || 'http://localhost:3000';
-});
-
-saveBackendUrlBtn.addEventListener('click', () => {
-  const url = backendUrlInput.value.trim().replace(/\/$/, ''); // strip trailing slash
-  if (!url) {
-    showResult('<span class="result-card__icon">⚠️</span> Please enter a valid backend URL.', 'error');
-    return;
-  }
-  chrome.runtime.sendMessage({ action: 'SAVE_BACKEND_URL', url }, (response) => {
-    if (chrome.runtime.lastError || !response?.success) {
-      showResult('<span class="result-card__icon">❌</span> Failed to save backend URL.', 'error');
-      return;
-    }
-    showResult('<span class="result-card__icon">✅</span> Backend URL saved.', 'success');
-  });
-});
-
-// ─────────────────────────────────────────────
-// LOGIN / LOGOUT
-// ─────────────────────────────────────────────
-
-// Toggle login password visibility
-toggleLoginPwVisibility.addEventListener('click', () => {
-  const isPassword = loginPasswordInput.type === 'password';
-  loginPasswordInput.type = isPassword ? 'text' : 'password';
-  toggleLoginPwVisibility.textContent = isPassword ? '🙈' : '👁';
-});
-
-// Login button
-loginBtn.addEventListener('click', async () => {
-  const email    = loginEmailInput.value.trim();
-  const password = loginPasswordInput.value;
-
-  if (!email || !password) {
-    showResult('<span class="result-card__icon">⚠️</span> Please enter your email and password.', 'error');
-    return;
-  }
-
-  loginBtn.disabled = true;
-  loginBtn.textContent = 'Logging in…';
-
-  chrome.runtime.sendMessage({ action: 'LOGIN', email, password }, (response) => {
-    loginBtn.disabled = false;
-    loginBtn.textContent = 'Login';
-
-    if (chrome.runtime.lastError) {
-      showResult(`<span class="result-card__icon">❌</span> Extension error: ${chrome.runtime.lastError.message}`, 'error');
-      return;
-    }
-
-    if (!response?.success) {
-      showResult(`<span class="result-card__icon">❌</span> ${escapeHtml(response?.error || 'Login failed.')}`, 'error');
-      return;
-    }
-
-    loginEmailInput.value    = '';
-    loginPasswordInput.value = '';
-    setAuthStatusBadge('ok', 'Logged in ✓');
-    loginSection.style.display    = 'none';
-    loggedInSection.style.display = '';
-    showResult('<span class="result-card__icon">✅</span> Logged in! Profile data will be used automatically.', 'success');
-
-    // Kick off a background cache warm-up
-    chrome.runtime.sendMessage({ action: 'SYNC_PROFILE' });
-  });
-});
-
-// Allow pressing Enter in password field to trigger login
-loginPasswordInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') loginBtn.click();
-});
-
-// Logout button
-logoutBtn.addEventListener('click', () => {
-  chrome.runtime.sendMessage({ action: 'LOGOUT' }, () => {
-    setAuthStatusBadge('missing', 'Not logged in');
-    loginSection.style.display    = '';
-    loggedInSection.style.display = 'none';
-    syncProfileNote.style.display = 'none';
-    showResult('<span class="result-card__icon">ℹ️</span> Logged out. Using manual context only.', 'info');
-  });
-});
-
-// ─────────────────────────────────────────────
-// SYNC PROFILE
-// ─────────────────────────────────────────────
-
-syncProfileBtn.addEventListener('click', () => {
-  syncProfileBtnText.textContent = '⏳ Syncing…';
-  syncProfileBtn.disabled = true;
-
-  chrome.runtime.sendMessage({ action: 'SYNC_PROFILE' }, (response) => {
-    syncProfileBtn.disabled = false;
-    syncProfileBtnText.textContent = '🔄 Sync Profile';
-
-    if (chrome.runtime.lastError) {
-      showResult(`<span class="result-card__icon">❌</span> ${chrome.runtime.lastError.message}`, 'error');
-      return;
-    }
-
-    if (!response?.success) {
-      showResult(`<span class="result-card__icon">❌</span> ${escapeHtml(response?.error || 'Sync failed.')}`, 'error');
-      return;
-    }
-
-    const note = `✅ Synced ${response.fieldCount} field aliases from your profile.`;
-    syncProfileNote.textContent   = note;
-    syncProfileNote.style.display = '';
-    showResult(`<span class="result-card__icon">✅</span> Profile synced — ${response.fieldCount} field aliases ready.`, 'success');
-  });
-});
-
-// ─────────────────────────────────────────────
-// INIT
-// ─────────────────────────────────────────────
-
-// Check API key status on popup open
-checkApiKeyStatus();
-
-// Check auth status on popup open
-checkAuthStatus();
-
-// ─── Context textarea: auto-save user overrides ──────────────────────────────
-// The textarea is an optional extra-context field; data now comes from the DB.
-// We still persist whatever the user types so it survives popup close/open.
-let saveTimer;
-contextInput.addEventListener('input', () => {
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    chrome.storage.local.set({ savedContext: contextInput.value });
-  }, 800);
-});
-
-// Restore any previously typed context override
-chrome.storage.local.get(['savedContext'], (result) => {
-  if (result.savedContext) {
-    contextInput.value = result.savedContext;
-    charCount.textContent = contextInput.value.length;
-  }
-});
-
-// Auto-save JD to storage as user types (debounced)
-let jdSaveTimer;
 jdInput.addEventListener('input', () => {
-  clearTimeout(jdSaveTimer);
-  jdSaveTimer = setTimeout(() => {
-    chrome.storage.local.set({ savedJd: jdInput.value });
-  }, 800);
+  jdCharCount.textContent = jdInput.value.length;
 });
 
-// Load saved JD
-chrome.storage.local.get(['savedJd'], (result) => {
-  if (result.savedJd) {
-    jdInput.value = result.savedJd;
-    jdCharCount.textContent = result.savedJd.length;
-    if (result.savedJd.trim().length > 0) {
-      jdToggle.setAttribute('aria-expanded', 'true');
-      jdBody.classList.remove('jd-body--collapsed');
-      jdBody.classList.add('jd-body--open');
+// ─────────────────────────────────────────────
+// PROFILE MANAGEMENT
+// ─────────────────────────────────────────────
+function loadProfile() {
+  chrome.runtime.sendMessage({ action: 'GET_PROFILE' }, (res) => {
+    if (res?.success && res.profile) {
+      const p = res.profile;
+      document.getElementById('prof_full_name').value = p.full_name || '';
+      document.getElementById('prof_email').value = p.email || '';
+      document.getElementById('prof_phone').value = p.phone || '';
+      document.getElementById('prof_highest_education').value = p.highest_education || '';
+      document.getElementById('prof_degree').value = p.degree || '';
+      document.getElementById('prof_current_salary').value = p.current_salary || '';
+      document.getElementById('prof_expected_salary').value = p.expected_salary || '';
+      document.getElementById('prof_linkedin_url').value = p.linkedin_url || '';
+      document.getElementById('prof_github_url').value = p.github_url || '';
     }
+  });
+}
+
+profileForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const data = {
+    full_name: document.getElementById('prof_full_name').value,
+    email: document.getElementById('prof_email').value,
+    phone: document.getElementById('prof_phone').value,
+    highest_education: document.getElementById('prof_highest_education').value,
+    degree: document.getElementById('prof_degree').value,
+    current_salary: parseFloat(document.getElementById('prof_current_salary').value) || undefined,
+    expected_salary: parseFloat(document.getElementById('prof_expected_salary').value) || undefined,
+    linkedin_url: document.getElementById('prof_linkedin_url').value,
+    github_url: document.getElementById('prof_github_url').value,
+  };
+
+  saveProfileBtn.disabled = true;
+  chrome.runtime.sendMessage({ action: 'SAVE_PROFILE', profileData: data }, (res) => {
+    saveProfileBtn.disabled = false;
+    if (res?.success) {
+      profileResultCard.innerHTML = '✅ Profile saved!';
+      profileResultCard.className = 'result-card result-card--success';
+    } else {
+      profileResultCard.innerHTML = `❌ Error: ${res?.error}`;
+      profileResultCard.className = 'result-card result-card--error';
+    }
+    setTimeout(() => { profileResultCard.className = 'result-card result-card--hidden'; }, 3000);
+  });
+});
+
+extractResumeBtn.addEventListener('click', async () => {
+  // If we already have a primary resume, we could extract from the backend directly
+  // But wait, our API takes a file upload. Let's just ask user to select a file if they click this.
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'application/pdf';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    extractResumeBtn.disabled = true;
+    extractResultCard.innerHTML = '🪄 Extracting...';
+    extractResultCard.className = 'result-card result-card--info';
+
+    try {
+      const fileData = await readFileAsDataURL(file);
+      chrome.runtime.sendMessage({
+        action: 'EXTRACT_RESUME',
+        fileData,
+        fileName: file.name,
+        mimeType: file.type
+      }, (res) => {
+        extractResumeBtn.disabled = false;
+        if (res?.success) {
+          extractResultCard.innerHTML = '✅ Extraction complete!';
+          extractResultCard.className = 'result-card result-card--success';
+          const p = res.data;
+          if(p.full_name) document.getElementById('prof_full_name').value = p.full_name;
+          if(p.email) document.getElementById('prof_email').value = p.email;
+          if(p.phone) document.getElementById('prof_phone').value = p.phone;
+          if(p.highest_education) document.getElementById('prof_highest_education').value = p.highest_education;
+          if(p.degree) document.getElementById('prof_degree').value = p.degree;
+          if(p.linkedin_url) document.getElementById('prof_linkedin_url').value = p.linkedin_url;
+          if(p.github_url) document.getElementById('prof_github_url').value = p.github_url;
+        } else {
+          extractResultCard.innerHTML = `❌ Error: ${res?.error}`;
+          extractResultCard.className = 'result-card result-card--error';
+        }
+        setTimeout(() => { extractResultCard.className = 'result-card result-card--hidden'; }, 5000);
+      });
+    } catch (err) {
+      extractResumeBtn.disabled = false;
+      extractResultCard.innerHTML = `❌ Error: ${err.message}`;
+      extractResultCard.className = 'result-card result-card--error';
+    }
+  };
+  input.click();
+});
+
+// Settings panel toggle
+document.getElementById('settingsToggle').addEventListener('click', (e) => {
+  const toggle = e.currentTarget;
+  const isExpanded = toggle.getAttribute('aria-expanded') === 'true';
+  toggle.setAttribute('aria-expanded', String(!isExpanded));
+  const body = document.getElementById('settingsBody');
+  if (isExpanded) {
+    body.classList.remove('settings-body--open');
+    body.classList.add('settings-body--collapsed');
+  } else {
+    body.classList.remove('settings-body--collapsed');
+    body.classList.add('settings-body--open');
   }
 });
 
-console.log('[AI Form Filler] Popup initialized.');
+// INIT
+checkAuthStatus();

@@ -1,9 +1,5 @@
 import mongoose from 'mongoose';
 
-/**
- * Profile — one-to-one with User.
- * Stores all candidate details used for form-filling, resume generation, etc.
- */
 const profileSchema = new mongoose.Schema(
   {
     // ── Relationship ─────────────────────────────────────────────────────────

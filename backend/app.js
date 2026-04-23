@@ -9,6 +9,7 @@ import profileRoutes from './routes/profileRoutes.js';
 import resumeRoutes from './routes/resumeRoutes.js';
 import generatedResumeRoutes from './routes/generatedResumeRoutes.js';
 import applicationRoutes from './routes/applicationRoutes.js';
+import formFillRoutes from './routes/formFillRoutes.js';
 import errorHandler from './middleware/errorHandler.js';
 
 const app = express();
@@ -33,6 +34,7 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/resumes', resumeRoutes);
 app.use('/api/generated-resumes', generatedResumeRoutes);
 app.use('/api/applications', applicationRoutes);
+app.use('/api/form-filler', formFillRoutes);
 
 // ── 404 Handler ──────────────────────────────────────────────────────────────
 app.use((_req, res) => {

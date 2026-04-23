@@ -150,3 +150,23 @@ export const getProfileFormData = asyncHandler(async (req, res) => {
     throw err;
   }
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/profile/extract-resume
+// Uploads a resume PDF, extracts Profile schema fields via Gemini, and returns them.
+// ─────────────────────────────────────────────────────────────────────────────
+import { extractProfileFromResume as geminiExtract } from '../utils/gemini.js';
+
+export const extractProfileFromResume = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    return sendBadRequest(res, 'No resume PDF provided.');
+  }
+
+  const pdfBase64 = req.file.buffer.toString('base64');
+  try {
+    const profileData = await geminiExtract(pdfBase64, req.file.mimetype);
+    return sendSuccess(res, profileData, 'Resume extracted successfully');
+  } catch (err) {
+    return sendError(res, err.message, 500);
+  }
+});
