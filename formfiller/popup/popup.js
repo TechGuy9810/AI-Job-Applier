@@ -35,6 +35,12 @@ const loginEmail = document.getElementById('loginEmail');
 const loginPassword = document.getElementById('loginPassword');
 const loginBtn = document.getElementById('loginBtn');
 const logoutBtn = document.getElementById('logoutBtn');
+const signupName = document.getElementById('signupName');
+const signupFields = document.getElementById('signupFields');
+const toggleAuthModeBtn = document.getElementById('toggleAuthModeBtn');
+const authModeLabel = document.getElementById('authModeLabel');
+
+let isSignupMode = false;
 
 // Profile Form Elements
 const profileForm = document.getElementById('profileForm');
@@ -85,23 +91,56 @@ function checkAuthStatus() {
   });
 }
 
+toggleAuthModeBtn.addEventListener('click', () => {
+  isSignupMode = !isSignupMode;
+  if (isSignupMode) {
+    authModeLabel.textContent = 'Create Account';
+    toggleAuthModeBtn.textContent = 'Login instead';
+    signupFields.style.display = 'block';
+    loginBtn.textContent = 'Sign Up';
+  } else {
+    authModeLabel.textContent = 'Login';
+    toggleAuthModeBtn.textContent = 'Create Account instead';
+    signupFields.style.display = 'none';
+    loginBtn.textContent = 'Login';
+  }
+});
+
 loginBtn.addEventListener('click', () => {
   const email = loginEmail.value.trim();
   const password = loginPassword.value;
   if (!email || !password) return;
 
-  loginBtn.textContent = 'Logging in…';
-  loginBtn.disabled = true;
+  if (isSignupMode) {
+    const name = signupName.value.trim();
+    if (!name) return;
+    
+    loginBtn.textContent = 'Signing up…';
+    loginBtn.disabled = true;
 
-  chrome.runtime.sendMessage({ action: 'LOGIN', email, password }, (res) => {
-    loginBtn.textContent = 'Login';
-    loginBtn.disabled = false;
-    if (res?.success) {
-      checkAuthStatus();
-    } else {
-      alert(`Login failed: ${res?.error}`);
-    }
-  });
+    chrome.runtime.sendMessage({ action: 'SIGNUP', name, email, password }, (res) => {
+      loginBtn.textContent = 'Sign Up';
+      loginBtn.disabled = false;
+      if (res?.success) {
+        checkAuthStatus();
+      } else {
+        alert(`Signup failed: ${res?.error}`);
+      }
+    });
+  } else {
+    loginBtn.textContent = 'Logging in…';
+    loginBtn.disabled = true;
+
+    chrome.runtime.sendMessage({ action: 'LOGIN', email, password }, (res) => {
+      loginBtn.textContent = 'Login';
+      loginBtn.disabled = false;
+      if (res?.success) {
+        checkAuthStatus();
+      } else {
+        alert(`Login failed: ${res?.error}`);
+      }
+    });
+  }
 });
 
 logoutBtn.addEventListener('click', () => {

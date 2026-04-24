@@ -218,10 +218,21 @@
 
     <div id="settingsBody" class="settings-body settings-body--collapsed">
       <div class="settings-section">
-        <!-- Login form (shown when logged out) -->
+        <!-- Auth form (shown when logged out) -->
         <div id="loginSection">
-          <label class="label" for="loginEmail" style="margin-top:10px;">Email</label>
+          <div style="display:flex; justify-content: space-between; margin-top: 10px; align-items: baseline;">
+            <label class="label" id="authModeLabel" style="margin-top: 0;">Login</label>
+            <button id="toggleAuthModeBtn" style="background: none; border: none; color: var(--accent); cursor: pointer; font-size: 11px; text-decoration: underline; font-family: inherit; transition: color var(--transition);">Create Account instead</button>
+          </div>
+          
+          <div id="signupFields" style="display: none;">
+            <label class="label" for="signupName" style="margin-top:8px;">Name</label>
+            <input id="signupName" type="text" class="input" placeholder="Your Name" autocomplete="name" />
+          </div>
+
+          <label class="label" for="loginEmail" style="margin-top:8px;">Email</label>
           <input id="loginEmail" type="email" class="input" placeholder="you@example.com" autocomplete="email" />
+          
           <label class="label" for="loginPassword" style="margin-top:8px;">Password</label>
           <div class="api-key-row">
             <input id="loginPassword" type="password" class="input" placeholder="••••••••" autocomplete="current-password" />

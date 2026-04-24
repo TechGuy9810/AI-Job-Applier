@@ -1,21 +1,4 @@
-/**
- * Standardized API response utilities.
- * All controllers should use these helpers to ensure consistent response shape.
- *
- * Success shape:
- * { success: true, message: string, data: any }
- *
- * Error shape:
- * { success: false, message: string, errors?: any }
- */
 
-/**
- * Send a successful response.
- * @param {import('express').Response} res
- * @param {any} data - Payload to return
- * @param {string} message - Human-readable message
- * @param {number} statusCode - HTTP status (default 200)
- */
 export const sendSuccess = (res, data, message = 'Success', statusCode = 200) => {
   return res.status(statusCode).json({
     success: true,
@@ -24,20 +7,11 @@ export const sendSuccess = (res, data, message = 'Success', statusCode = 200) =>
   });
 };
 
-/**
- * Send a 201 Created response.
- */
+
 export const sendCreated = (res, data, message = 'Created successfully') => {
   return sendSuccess(res, data, message, 201);
 };
 
-/**
- * Send an error response.
- * @param {import('express').Response} res
- * @param {string} message - Error description
- * @param {number} statusCode - HTTP status (default 500)
- * @param {any} errors - Optional detailed errors (e.g. Zod validation errors)
- */
 export const sendError = (res, message = 'Something went wrong', statusCode = 500, errors = null) => {
   const body = { success: false, message };
   if (errors) body.errors = errors;

@@ -9,12 +9,7 @@ function getApiKey() {
   return apiKey;
 }
 
-/**
- * Extracts profile fields from a resume PDF.
- * @param {string} pdfBase64 
- * @param {string} mimeType 
- * @returns {Promise<Object>}
- */
+
 export async function extractProfileFromResume(pdfBase64, mimeType = 'application/pdf') {
   const apiKey = getApiKey();
   const endpoint = `${GEMINI_API_BASE}/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
@@ -77,7 +72,7 @@ Rules:
 
   const data = await response.json();
   const content = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-  
+
   if (!content) {
     throw new Error('Gemini returned an empty response.');
   }
@@ -93,10 +88,6 @@ Rules:
   return result;
 }
 
-/**
- * Extracts structured data (skills, experience, projects, education) from a resume PDF
- * to populate the Resume schema.
- */
 export async function extractResumeData(pdfBase64, mimeType = 'application/pdf') {
   const apiKey = getApiKey();
   const endpoint = `${GEMINI_API_BASE}/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
@@ -174,10 +165,6 @@ Only return valid JSON matching this schema. If a section is missing, return an 
   return result;
 }
 
-/**
- * Maps webpage form fields to user details.
- * Uses extracted text context instead of PDF base64 to save tokens.
- */
 export async function mapFormFields(fields, contextString) {
   const apiKey = getApiKey();
   const endpoint = `${GEMINI_API_BASE}/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
@@ -237,7 +224,7 @@ Return ONLY valid JSON like:
 
   const data = await response.json();
   const content = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-  
+
   if (!content) {
     throw new Error('Gemini returned an empty response.');
   }
@@ -314,7 +301,7 @@ Return ONLY valid JSON where keys EXACTLY match the question labels:
 
   const data = await response.json();
   const content = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-  
+
   if (!content) {
     throw new Error('Gemini returned an empty response.');
   }

@@ -14,11 +14,8 @@ import {
   deleteProfileService,
 } from '../services/profileService.js';
 import { profileToFormData } from '../utils/profileToFormData.js';
+import { extractProfileFromResume as geminiExtract } from '../utils/gemini.js';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/profile
-// Returns the authenticated user's profile.
-// ─────────────────────────────────────────────────────────────────────────────
 export const getProfile = asyncHandler(async (req, res) => {
   const userId = req.user.id;
 
@@ -33,10 +30,6 @@ export const getProfile = asyncHandler(async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// POST /api/profile
-// Creates a new profile for the authenticated user.
-// ─────────────────────────────────────────────────────────────────────────────
 export const createProfile = asyncHandler(async (req, res) => {
   const userId = req.user.id;
 
@@ -75,10 +68,6 @@ export const createProfile = asyncHandler(async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PATCH /api/profile
-// Partial update (upsert) — only provided fields are overwritten.
-// ─────────────────────────────────────────────────────────────────────────────
 export const updateProfile = asyncHandler(async (req, res) => {
   const userId = req.user.id;
 
@@ -111,10 +100,6 @@ export const updateProfile = asyncHandler(async (req, res) => {
   return sendSuccess(res, profile, 'Profile updated successfully');
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DELETE /api/profile
-// Removes the authenticated user's profile.
-// ─────────────────────────────────────────────────────────────────────────────
 export const deleteProfile = asyncHandler(async (req, res) => {
   const userId = req.user.id;
 
@@ -129,13 +114,7 @@ export const deleteProfile = asyncHandler(async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/profile/form-data
-// Returns the profile as a flat, alias-expanded key→value map for form filling.
-// The extension consumes this directly — every common synonym of a field is
-// emitted as a separate key so the fuzzy-matcher always finds a deterministic
-// match before Gemini is even consulted.
-// ─────────────────────────────────────────────────────────────────────────────
+
 export const getProfileFormData = asyncHandler(async (req, res) => {
   const userId = req.user.id;
 
@@ -151,11 +130,7 @@ export const getProfileFormData = asyncHandler(async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// POST /api/profile/extract-resume
-// Uploads a resume PDF, extracts Profile schema fields via Gemini, and returns them.
-// ─────────────────────────────────────────────────────────────────────────────
-import { extractProfileFromResume as geminiExtract } from '../utils/gemini.js';
+
 
 export const extractProfileFromResume = asyncHandler(async (req, res) => {
   if (!req.file) {

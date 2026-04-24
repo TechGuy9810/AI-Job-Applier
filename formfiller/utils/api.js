@@ -36,8 +36,32 @@ export function clearAuthToken() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AUTHENTICATION — POST /api/auth/login
+// AUTHENTICATION — POST /api/auth/login & /api/auth/signup
 // ─────────────────────────────────────────────────────────────────────────────
+export async function signup(name, email, password) {
+  const baseUrl = await getBackendUrl();
+  const response = await fetch(`${baseUrl}/api/auth/signup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, email, password }),
+  });
+
+  if (!response.ok) {
+    let message = `Signup failed (${response.status})`;
+    try {
+      const body = await response.json();
+      message = body?.message || message;
+    } catch (_) {}
+    throw new Error(message);
+  }
+
+  const data = await response.json();
+  const token = data?.data?.token;
+  if (!token) throw new Error('No token returned from signup endpoint');
+
+  await saveAuthToken(token);
+  return data.data;
+}
 export async function login(email, password) {
   const baseUrl = await getBackendUrl();
   const response = await fetch(`${baseUrl}/api/auth/login`, {

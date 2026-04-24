@@ -12,8 +12,6 @@ router.post('/', upload.single('resume'), resumeController.createResume);
 router.get('/:id', resumeController.getResumeById);
 router.patch('/:id', resumeController.updateResume);
 router.delete('/:id', resumeController.deleteResume);
-
-// Convenience endpoint
 router.post('/:id/primary', resumeController.setPrimaryResume);
 
 export default router;

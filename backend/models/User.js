@@ -31,24 +31,15 @@ const userSchema = new mongoose.Schema({
 
 }, { timestamps: true });
 
-
-// 🔥 Hash password before saving
-userSchema.pre('save', async function (next) {
-    if (!this.password || !this.isModified('password')) return next();
+userSchema.pre('save', async function () {
+    if (!this.password || !this.isModified('password')) return;
 
     this.password = await bcrypt.hash(this.password, 10);
-    next();
 });
-
-
-// 🔥 Compare password
 userSchema.methods.comparePassword = async function (password) {
     if (!this.password) return false;
     return await bcrypt.compare(password, this.password);
 };
-
-
-// 🔥 Remove sensitive fields
 userSchema.methods.toJSON = function () {
     const obj = this.toObject();
     delete obj.password;

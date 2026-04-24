@@ -6,6 +6,7 @@
 
 import {
   login,
+  signup,
   getAuthToken,
   clearAuthToken,
   fillFormFields,
@@ -158,6 +159,18 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     (async () => {
       try {
         const userData = await login(message.email, message.password);
+        sendResponse({ success: true, user: userData.user });
+      } catch (err) {
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
+    return true;
+  }
+
+  if (message.action === 'SIGNUP') {
+    (async () => {
+      try {
+        const userData = await signup(message.name, message.email, message.password);
         sendResponse({ success: true, user: userData.user });
       } catch (err) {
         sendResponse({ success: false, error: err.message });
