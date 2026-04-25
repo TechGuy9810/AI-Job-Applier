@@ -215,12 +215,10 @@ export async function saveProfile(profileData) {
   if (!token) throw new Error('NOT_AUTHENTICATED');
 
   const baseUrl = await getBackendUrl();
-  // First check if profile exists
-  const existing = await getProfile();
-  const method = existing ? 'PATCH' : 'POST';
-
+  // Always use PATCH — the backend updateProfileService uses upsert:true,
+  // so it will create the profile if it doesn't exist or update it if it does.
   const response = await fetch(`${baseUrl}/api/profile`, {
-    method,
+    method: 'PATCH',
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
@@ -228,7 +226,15 @@ export async function saveProfile(profileData) {
     body: JSON.stringify(profileData)
   });
 
-  if (!response.ok) throw new Error('Failed to save profile');
+  if (!response.ok) {
+    let message = `Failed to save profile (${response.status})`;
+    try {
+      const body = await response.json();
+      message = body?.message || message;
+    } catch (_) {}
+    throw new Error(message);
+  }
+
   const data = await response.json();
   return data.data;
 }

@@ -7,6 +7,7 @@ import {
   sendConflict,
   sendError,
 } from '../utils/response.js';
+import { extractProfileFromResume } from '../utils/gemini.js';
 import {
   getProfileService,
   createProfileService,
@@ -14,7 +15,6 @@ import {
   deleteProfileService,
 } from '../services/profileService.js';
 import { profileToFormData } from '../utils/profileToFormData.js';
-import { extractProfileFromResume as geminiExtract } from '../utils/gemini.js';
 
 export const getProfile = asyncHandler(async (req, res) => {
   const userId = req.user.id;
@@ -40,8 +40,6 @@ export const createProfile = asyncHandler(async (req, res) => {
     disability,
     address_line, city, state, pincode, country,
     current_salary, expected_salary, notice_period,
-    highest_education, degree,
-    highest_education_start_year, highest_education_end_year,
     preferred_locations,
     linkedin_url, portfolio_url, github_url,
   } = req.body;
@@ -53,8 +51,6 @@ export const createProfile = asyncHandler(async (req, res) => {
       disability,
       address_line, city, state, pincode, country,
       current_salary, expected_salary, notice_period,
-      highest_education, degree,
-      highest_education_start_year, highest_education_end_year,
       preferred_locations,
       linkedin_url, portfolio_url, github_url,
     });
@@ -78,8 +74,6 @@ export const updateProfile = asyncHandler(async (req, res) => {
     'disability',
     'address_line', 'city', 'state', 'pincode', 'country',
     'current_salary', 'expected_salary', 'notice_period',
-    'highest_education', 'degree',
-    'highest_education_start_year', 'highest_education_end_year',
     'preferred_locations',
     'linkedin_url', 'portfolio_url', 'github_url',
   ];
@@ -131,17 +125,19 @@ export const getProfileFormData = asyncHandler(async (req, res) => {
 });
 
 
-
-export const extractProfileFromResume = asyncHandler(async (req, res) => {
+export const extractResumeForProfile = asyncHandler(async (req, res) => {
   if (!req.file) {
-    return sendBadRequest(res, 'No resume PDF provided.');
+    return sendBadRequest(res, 'No resume file uploaded');
   }
 
   const pdfBase64 = req.file.buffer.toString('base64');
+  const mimeType = req.file.mimetype;
+
   try {
-    const profileData = await geminiExtract(pdfBase64, req.file.mimetype);
-    return sendSuccess(res, profileData, 'Resume extracted successfully');
+    const profileData = await extractProfileFromResume(pdfBase64, mimeType);
+    return sendSuccess(res, profileData, 'Profile extracted from resume successfully');
   } catch (err) {
-    return sendError(res, err.message, 500);
+    console.error('Gemini profile extraction failed:', err.message);
+    return sendError(res, `Failed to extract profile from resume: ${err.message}`, 500);
   }
 });

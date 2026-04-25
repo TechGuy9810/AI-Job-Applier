@@ -53,20 +53,10 @@ const resumeSchema = new Schema(
       type: String,
       default: null
     },
-    pdfBase64: { // We store the base64 just in case they need to upload the actual file to forms later
-      type: String,
-      default: null
-    },
-    mimeType: {
-      type: String,
-      default: "application/pdf"
-    },
-    data: {
-      skills: [{ type: String }],
-      experience: [experienceSchema],
-      projects: [projectSchema],
-      education: [educationSchema]
-    }
+    skills: [{ type: String }],
+    experience: [experienceSchema],
+    projects: [projectSchema],
+    education: [educationSchema]
   },
   {
     timestamps: true // adds createdAt & updatedAt

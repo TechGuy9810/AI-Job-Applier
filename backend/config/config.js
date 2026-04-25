@@ -11,6 +11,11 @@ const config = {
     model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
     apiBase: 'https://generativelanguage.googleapis.com/v1beta/models',
   },
+  cloudinary: {
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    apiSecret: process.env.CLOUDINARY_API_SECRET,
+  },
 };
 
 export default config;

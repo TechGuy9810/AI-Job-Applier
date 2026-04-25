@@ -87,39 +87,6 @@ const profileSchema = new mongoose.Schema(
       type: Number, // in days — e.g. 30, 60, 90
       min: 0,
     },
-
-    // ── Education ─────────────────────────────────────────────────────────────
-    highest_education: {
-      type: String,
-      enum: [
-        'high_school',
-        'diploma',
-        'bachelors',
-        'masters',
-        'phd',
-        'postdoc',
-        'other',
-      ],
-    },
-
-    degree: {
-      type: String,
-      trim: true, // e.g. "B.Tech Computer Science"
-    },
-
-    highest_education_start_year: {
-      type: Number,
-      min: 1950,
-      max: new Date().getFullYear(),
-    },
-
-    highest_education_end_year: {
-      type: Number,
-      min: 1950,
-      max: new Date().getFullYear() + 10, // allow future graduation
-    },
-
-    // ── Job Preferences ───────────────────────────────────────────────────────
     preferred_locations: {
       type: [String], // e.g. ["Bangalore", "Remote", "Mumbai"]
       default: [],

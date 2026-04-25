@@ -70,11 +70,34 @@ async function runFormFillFlow(tabId) {
   console.log(`[AI Form Filler BG] Got ${fields.length} fields. Sending to backend for mapping...`);
 
   // Call backend to get mapping
-  const mapping = await fillFormFields(fields);
+  const responseData = await fillFormFields(fields);
+  const mapping = responseData.mapping || responseData; // Fallback in case of old API
+  const resumeUrl = responseData.resume_url;
   console.log('[AI Form Filler BG] Received mapping from backend:', mapping);
 
   if (!mapping || Object.keys(mapping).length === 0) {
     throw new Error('Backend returned an empty mapping.');
+  }
+
+  // Fetch resume if URL is provided
+  let pdfBase64 = null;
+  let pdfMimeType = 'application/pdf';
+  let pdfFileName = 'Resume.pdf';
+
+  if (resumeUrl) {
+    try {
+      console.log('[AI Form Filler BG] Fetching resume from:', resumeUrl);
+      const res = await fetch(resumeUrl);
+      const blob = await res.blob();
+      pdfBase64 = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result.split(',')[1]);
+        reader.readAsDataURL(blob);
+      });
+      console.log('[AI Form Filler BG] Resume fetched and converted to base64 successfully.');
+    } catch (err) {
+      console.warn('[AI Form Filler BG] Failed to fetch resume PDF:', err);
+    }
   }
 
   // Fill the form using the mapping
@@ -82,6 +105,9 @@ async function runFormFillFlow(tabId) {
     action: 'FILL_FORM',
     mapping,
     fields,
+    pdfBase64,
+    pdfMimeType,
+    pdfFileName
   });
 
   if (!fillResponse?.success) {
@@ -134,12 +160,37 @@ async function runAnswerQuestionsFlow(jd, tabId) {
     return { questionsFound: 0, questionsFilled: 0 };
   }
 
-  const mapping = await answerQuestionsAPI(questionFields, jd);
+  const responseData = await answerQuestionsAPI(questionFields, jd);
+  const mapping = responseData.answers || responseData;
+  const resumeUrl = responseData.resume_url;
+
+  // Fetch resume if URL is provided
+  let pdfBase64 = null;
+  let pdfMimeType = 'application/pdf';
+  let pdfFileName = 'Resume.pdf';
+
+  if (resumeUrl) {
+    try {
+      console.log('[AI Form Filler BG] Fetching resume from:', resumeUrl);
+      const res = await fetch(resumeUrl);
+      const blob = await res.blob();
+      pdfBase64 = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result.split(',')[1]);
+        reader.readAsDataURL(blob);
+      });
+    } catch (err) {
+      console.warn('[AI Form Filler BG] Failed to fetch resume PDF:', err);
+    }
+  }
   
   const fillResponse = await sendToContentScript(tabId, {
     action: 'FILL_FORM',
     mapping,
     fields: questionFields,
+    pdfBase64,
+    pdfMimeType,
+    pdfFileName
   });
 
   return {

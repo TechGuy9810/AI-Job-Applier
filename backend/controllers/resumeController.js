@@ -3,35 +3,46 @@ import {
   sendSuccess,
   sendNotFound,
   sendBadRequest,
+  sendError,
 } from '../utils/response.js';
 import * as resumeService from '../services/resumeService.js';
 import { extractResumeData } from '../utils/gemini.js';
+import { uploadPdfToCloudinary } from '../utils/cloudinary.js';
 
 export const createResume = asyncHandler(async (req, res) => {
   const { label, is_primary } = req.body;
   let pdfBase64 = null;
   let mimeType = 'application/pdf';
   let resumeData = null;
+  let file_url = null;
 
   if (req.file) {
     pdfBase64 = req.file.buffer.toString('base64');
     mimeType = req.file.mimetype;
-    
-    // Extract structured data using Gemini
+
+    // Extract structured data using Gemini — required, not optional
     try {
       resumeData = await extractResumeData(pdfBase64, mimeType);
     } catch (err) {
-      console.error('Failed to extract resume data:', err);
-      // We can optionally fail here or just save the PDF without structured data. Let's let it pass without data if it fails, but typically we want it.
+      console.error('Gemini resume extraction failed:', err.message);
+      return sendError(res, `Failed to extract resume data: ${err.message}`, 500);
+    }
+
+    // Upload PDF to Cloudinary
+    try {
+      const cloudinaryResult = await uploadPdfToCloudinary(req.file.buffer);
+      file_url = cloudinaryResult.secure_url;
+    } catch (err) {
+      console.error('Cloudinary upload failed:', err.message);
+      return sendError(res, `Failed to upload resume file: ${err.message}`, 500);
     }
   }
 
   const resume = await resumeService.createResumeService(req.user.id, {
     label: label || 'My Resume',
     is_primary: is_primary === 'true' || is_primary === true,
-    pdfBase64,
-    mimeType,
-    data: resumeData
+    file_url,
+    ...(resumeData || {})
   });
 
   return sendSuccess(res, resume, 'Resume created successfully', 201);

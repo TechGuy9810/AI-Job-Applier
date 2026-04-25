@@ -29,9 +29,16 @@ export const fillForm = asyncHandler(async (req, res) => {
     // 2. Get Primary Resume Data
     const primaryResume = await Resume.findOne({ user_id: userId, is_primary: true });
     let resumeText = '';
-    if (primaryResume && primaryResume.data) {
-      resumeText = JSON.stringify(primaryResume.data, null, 2);
-    } else if (!primaryResume) {
+    if (primaryResume) {
+      // Build resume context from flat top-level fields (no .data wrapper)
+      const resumeFields = {
+        skills: primaryResume.skills,
+        experience: primaryResume.experience,
+        projects: primaryResume.projects,
+        education: primaryResume.education,
+      };
+      resumeText = JSON.stringify(resumeFields, null, 2);
+    } else {
       return sendBadRequest(res, 'No primary resume found. Please upload a resume first.');
     }
 
@@ -40,7 +47,7 @@ export const fillForm = asyncHandler(async (req, res) => {
     // 3. Call Gemini
     const mapping = await mapFormFields(fields, fullContext);
 
-    return sendSuccess(res, mapping, 'Form mapped successfully');
+    return sendSuccess(res, { mapping, resume_url: primaryResume?.file_url }, 'Form mapped successfully');
   } catch (err) {
     return sendError(res, err.message, 500);
   }
@@ -70,8 +77,15 @@ export const fillAnswers = asyncHandler(async (req, res) => {
     // 2. Get Primary Resume Data
     const primaryResume = await Resume.findOne({ user_id: userId, is_primary: true });
     let resumeText = '';
-    if (primaryResume && primaryResume.data) {
-      resumeText = JSON.stringify(primaryResume.data, null, 2);
+    if (primaryResume) {
+      // Build resume context from flat top-level fields (no .data wrapper)
+      const resumeFields = {
+        skills: primaryResume.skills,
+        experience: primaryResume.experience,
+        projects: primaryResume.projects,
+        education: primaryResume.education,
+      };
+      resumeText = JSON.stringify(resumeFields, null, 2);
     }
 
     const fullContext = [profileContext, context, resumeText].filter(Boolean).join('\n\n---\n\n');
@@ -79,7 +93,7 @@ export const fillAnswers = asyncHandler(async (req, res) => {
     // 3. Call Gemini
     const answers = await answerQuestions(fullContext, jd, questions);
 
-    return sendSuccess(res, answers, 'Questions answered successfully');
+    return sendSuccess(res, { answers, resume_url: primaryResume?.file_url }, 'Questions answered successfully');
   } catch (err) {
     return sendError(res, err.message, 500);
   }

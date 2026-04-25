@@ -321,12 +321,26 @@ function loadProfile() {
       document.getElementById('prof_full_name').value = p.full_name || '';
       document.getElementById('prof_email').value = p.email || '';
       document.getElementById('prof_phone').value = p.phone || '';
-      document.getElementById('prof_highest_education').value = p.highest_education || '';
-      document.getElementById('prof_degree').value = p.degree || '';
+      document.getElementById('prof_gender').value = p.gender || '';
+      document.getElementById('prof_nationality').value = p.nationality || '';
+      if (p.dob) {
+        document.getElementById('prof_dob').value = new Date(p.dob).toISOString().split('T')[0];
+      } else {
+        document.getElementById('prof_dob').value = '';
+      }
+      document.getElementById('prof_disability').checked = p.disability || false;
+      document.getElementById('prof_address_line').value = p.address_line || '';
+      document.getElementById('prof_city').value = p.city || '';
+      document.getElementById('prof_state').value = p.state || '';
+      document.getElementById('prof_pincode').value = p.pincode || '';
+      document.getElementById('prof_country').value = p.country || '';
       document.getElementById('prof_current_salary').value = p.current_salary || '';
       document.getElementById('prof_expected_salary').value = p.expected_salary || '';
+      document.getElementById('prof_notice_period').value = p.notice_period || '';
+      document.getElementById('prof_preferred_locations').value = p.preferred_locations ? p.preferred_locations.join(', ') : '';
       document.getElementById('prof_linkedin_url').value = p.linkedin_url || '';
       document.getElementById('prof_github_url').value = p.github_url || '';
+      document.getElementById('prof_portfolio_url').value = p.portfolio_url || '';
     }
   });
 }
@@ -337,12 +351,22 @@ profileForm.addEventListener('submit', (e) => {
     full_name: document.getElementById('prof_full_name').value,
     email: document.getElementById('prof_email').value,
     phone: document.getElementById('prof_phone').value,
-    highest_education: document.getElementById('prof_highest_education').value,
-    degree: document.getElementById('prof_degree').value,
+    gender: document.getElementById('prof_gender').value,
+    nationality: document.getElementById('prof_nationality').value,
+    dob: document.getElementById('prof_dob').value || undefined,
+    disability: document.getElementById('prof_disability').checked,
+    address_line: document.getElementById('prof_address_line').value,
+    city: document.getElementById('prof_city').value,
+    state: document.getElementById('prof_state').value,
+    pincode: document.getElementById('prof_pincode').value,
+    country: document.getElementById('prof_country').value,
     current_salary: parseFloat(document.getElementById('prof_current_salary').value) || undefined,
     expected_salary: parseFloat(document.getElementById('prof_expected_salary').value) || undefined,
+    notice_period: parseInt(document.getElementById('prof_notice_period').value) || undefined,
+    preferred_locations: document.getElementById('prof_preferred_locations').value.split(',').map(l => l.trim()).filter(Boolean),
     linkedin_url: document.getElementById('prof_linkedin_url').value,
     github_url: document.getElementById('prof_github_url').value,
+    portfolio_url: document.getElementById('prof_portfolio_url').value,
   };
 
   saveProfileBtn.disabled = true;
@@ -389,10 +413,22 @@ extractResumeBtn.addEventListener('click', async () => {
           if(p.full_name) document.getElementById('prof_full_name').value = p.full_name;
           if(p.email) document.getElementById('prof_email').value = p.email;
           if(p.phone) document.getElementById('prof_phone').value = p.phone;
-          if(p.highest_education) document.getElementById('prof_highest_education').value = p.highest_education;
-          if(p.degree) document.getElementById('prof_degree').value = p.degree;
+          if(p.gender) document.getElementById('prof_gender').value = p.gender;
+          if(p.nationality) document.getElementById('prof_nationality').value = p.nationality;
+          if(p.dob) document.getElementById('prof_dob').value = new Date(p.dob).toISOString().split('T')[0];
+          if(p.disability !== undefined) document.getElementById('prof_disability').checked = p.disability;
+          if(p.address_line) document.getElementById('prof_address_line').value = p.address_line;
+          if(p.city) document.getElementById('prof_city').value = p.city;
+          if(p.state) document.getElementById('prof_state').value = p.state;
+          if(p.pincode) document.getElementById('prof_pincode').value = p.pincode;
+          if(p.country) document.getElementById('prof_country').value = p.country;
+          if(p.current_salary) document.getElementById('prof_current_salary').value = p.current_salary;
+          if(p.expected_salary) document.getElementById('prof_expected_salary').value = p.expected_salary;
+          if(p.notice_period) document.getElementById('prof_notice_period').value = p.notice_period;
+          if(p.preferred_locations) document.getElementById('prof_preferred_locations').value = p.preferred_locations.join(', ');
           if(p.linkedin_url) document.getElementById('prof_linkedin_url').value = p.linkedin_url;
           if(p.github_url) document.getElementById('prof_github_url').value = p.github_url;
+          if(p.portfolio_url) document.getElementById('prof_portfolio_url').value = p.portfolio_url;
         } else {
           extractResultCard.innerHTML = `❌ Error: ${res?.error}`;
           extractResultCard.className = 'result-card result-card--error';

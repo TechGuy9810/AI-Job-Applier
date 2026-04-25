@@ -161,27 +161,57 @@
           <label class="label">Phone</label>
           <input type="text" id="prof_phone" class="input" />
         </div>
-      </div>
-
-      <!-- Professional / Education -->
-      <div class="profile-grid">
-        <div class="field-group full-width">
-          <label class="label">Highest Education</label>
-          <select id="prof_highest_education" class="input">
+        <div class="field-group">
+          <label class="label">Gender</label>
+          <select id="prof_gender" class="input">
             <option value="">Select...</option>
-            <option value="high_school">High School</option>
-            <option value="diploma">Diploma</option>
-            <option value="bachelors">Bachelors</option>
-            <option value="masters">Masters</option>
-            <option value="phd">PhD</option>
-            <option value="postdoc">Postdoc</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="non-binary">Non-binary</option>
+            <option value="prefer_not_to_say">Prefer not to say</option>
             <option value="other">Other</option>
           </select>
         </div>
-        <div class="field-group full-width">
-          <label class="label">Degree</label>
-          <input type="text" id="prof_degree" class="input" placeholder="e.g. B.Tech Computer Science" />
+        <div class="field-group">
+          <label class="label">Nationality</label>
+          <input type="text" id="prof_nationality" class="input" />
         </div>
+        <div class="field-group">
+          <label class="label">DOB</label>
+          <input type="date" id="prof_dob" class="input" />
+        </div>
+        <div class="field-group" style="display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" id="prof_disability" />
+          <label class="label" style="margin:0;">Disability</label>
+        </div>
+      </div>
+
+      <!-- Address -->
+      <div class="profile-grid">
+        <div class="field-group full-width">
+          <label class="label">Address Line</label>
+          <input type="text" id="prof_address_line" class="input" />
+        </div>
+        <div class="field-group">
+          <label class="label">City</label>
+          <input type="text" id="prof_city" class="input" />
+        </div>
+        <div class="field-group">
+          <label class="label">State</label>
+          <input type="text" id="prof_state" class="input" />
+        </div>
+        <div class="field-group">
+          <label class="label">Pincode</label>
+          <input type="text" id="prof_pincode" class="input" />
+        </div>
+        <div class="field-group">
+          <label class="label">Country</label>
+          <input type="text" id="prof_country" class="input" />
+        </div>
+      </div>
+
+      <!-- Professional / Availability -->
+      <div class="profile-grid">
         <div class="field-group">
           <label class="label">Current Salary</label>
           <input type="number" id="prof_current_salary" class="input" />
@@ -189,6 +219,18 @@
         <div class="field-group">
           <label class="label">Expected Salary</label>
           <input type="number" id="prof_expected_salary" class="input" />
+        </div>
+        <div class="field-group">
+          <label class="label">Notice Period (Days)</label>
+          <input type="number" id="prof_notice_period" class="input" />
+        </div>
+      </div>
+
+      <!-- Job Preferences -->
+      <div class="profile-grid">
+        <div class="field-group full-width">
+          <label class="label">Preferred Locations (comma separated)</label>
+          <input type="text" id="prof_preferred_locations" class="input" placeholder="e.g. Bangalore, Remote, Mumbai" />
         </div>
       </div>
 
@@ -200,6 +242,10 @@
       <div class="field-group">
         <label class="label">GitHub URL</label>
         <input type="url" id="prof_github_url" class="input" />
+      </div>
+      <div class="field-group">
+        <label class="label">Portfolio URL</label>
+        <input type="url" id="prof_portfolio_url" class="input" />
       </div>
 
       <button type="submit" id="saveProfileBtn" class="btn btn--primary" style="margin-top: 8px;">
